@@ -25,7 +25,7 @@ jobs:
         run: npm install
 
       - name: Run Newman — all requests (smoke test)
-        run: ENV=ci make test-newman
+        run: npm run test:newman
         continue-on-error: true
         env:
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
@@ -34,7 +34,7 @@ jobs:
           MEMBER_PASSWORD: ${{ secrets.MEMBER_PASSWORD }}
 
       - name: Run Newman — all flows
-        run: ENV=ci make test-newman-flows
+        run: npm test
         continue-on-error: false
         env:
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}

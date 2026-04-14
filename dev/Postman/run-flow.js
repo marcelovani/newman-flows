@@ -14,9 +14,9 @@
  *   node dev/Postman/run-flow.js "Organisation creation"
  *   node dev/Postman/run-flow.js "Member invitation" --env ci
  *
- * Or via Make:
- *   make test-newman FLOW="Organisation creation"
- *   make test-newman-flows
+ * Or via npm:
+ *   npm test                            # runs all flows via the mock server
+ *   node dev/Postman/run-flow.js "Organisation creation"
  */
 
 const fs   = require('fs');

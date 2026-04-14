@@ -4,6 +4,7 @@
   "description": "Workaround for running Postman Flows in CI without Enterprise",
   "scripts": {
     "test": "node test.js",
+    "test:newman": "mkdir -p tests/results/newman && newman run dev/Postman/collection/my-api.postman_collection.json --environment dev/Postman/environments/environment.ci.postman_environment.json --reporters cli,htmlextra --reporter-htmlextra-export tests/results/newman/smoke.html",
     "mock": "node mock-server.js"
   },
   "dependencies": {
