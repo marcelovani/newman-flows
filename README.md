@@ -8,33 +8,6 @@ Here's how we got around it — without duplicating a single request.
 
 ---
 
-## Try It Now
-
-The repo ships with a built-in mock server so you can run every flow immediately,
-without a real API or a Postman account.
-
-```bash
-git clone https://github.com/marcelovani/postman-flows.git
-cd postman-flows
-npm install
-npm test
-```
-
-`npm test` starts the mock server, runs every flow, and shuts it down. You should see:
-
-```
-✅ Flow "Member invitation" passed.
-✅ Flow "Organisation creation" passed.
-```
-
-> **About the demo:** The mock server (`mock-server.js`) is a lightweight Express app
-> that simulates every API endpoint used in the collection. It runs locally on port 3000
-> and accepts any credentials. This lets you explore the approach without connecting to
-> a real backend. When you adapt this for your own project, you point the flows at your
-> real API instead — see [Pointing at your real API](#pointing-at-your-real-api) below.
-
----
-
 ## The Problem: We Wanted Flows, Not Just Folders
 
 Our backend exposes a JSON REST API. We use Postman to document and test every endpoint.
@@ -421,6 +394,36 @@ have. A small Node.js script and a handful of JSON files gets you most of the wa
 
 If Postman ever ships Newman support for Flows on the free plan, delete `run-flow.js`
 and don't look back.
+
+The full implementation referenced in this post is at
+[github.com/marcelovani/postman-flows](https://github.com/marcelovani/postman-flows).
+
+---
+
+## Try It Now
+
+The repo ships with a built-in mock server so you can run every flow immediately,
+without a real API or a Postman account.
+
+> **About the demo:** The mock server (`mock-server.js`) is a lightweight Express app
+> that simulates every API endpoint used in the collection. It runs locally on port 3000
+> and accepts any credentials. This lets you explore the approach without connecting to
+> a real backend. When you adapt this for your own project, you point the flows at your
+> real API instead — see [Pointing at your real API](#pointing-at-your-real-api) above.
+
+```bash
+git clone https://github.com/marcelovani/postman-flows.git
+cd postman-flows
+npm install
+npm test
+```
+
+`npm test` starts the mock server, runs every flow, and shuts it down. You should see:
+
+```
+✅ Flow "Member invitation" passed.
+✅ Flow "Organisation creation" passed.
+```
 
 ---
 
