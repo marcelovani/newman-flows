@@ -8,56 +8,6 @@ Here's how we got around it — without duplicating a single request.
 
 ---
 
-## Running the examples in this repo
-
-The collection ships with a local mock server so you can run every flow without
-a real API or a Postman account.
-
-**Prerequisites:** Node.js 18+
-
-```bash
-git clone https://github.com/marcelovani/postman-flows.git
-cd postman-flows
-npm install
-npm test
-```
-
-That's it. `npm test` starts the mock server, runs every flow, and shuts the server down.
-You should see both flows pass:
-
-```
-✅ Flow "Member invitation" passed.
-✅ Flow "Organisation creation" passed.
-```
-
-### Running a single flow
-
-```bash
-# Start the mock server in one terminal
-npm run mock
-
-# Run a specific flow in another terminal
-ENV=mock node dev/Postman/run-flow.js "Organisation creation"
-ENV=mock node dev/Postman/run-flow.js "Member invitation"
-```
-
-### Pointing at a real API
-
-Export your Postman collection and environment, drop them into `dev/Postman/`, and run:
-
-```bash
-# Local API (uses environment.local.postman_environment.json)
-node dev/Postman/run-flow.js "Organisation creation"
-
-# CI (uses environment.ci.postman_environment.json)
-ENV=ci node dev/Postman/run-flow.js "Organisation creation"
-```
-
-Set `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MEMBER_USERNAME`, and `MEMBER_PASSWORD` as
-environment variables (or GitHub Actions secrets) for the CI environment.
-
----
-
 ## The Problem: We Wanted Flows, Not Just Folders
 
 Our backend exposes a JSON REST API. We use Postman to document and test every endpoint.
@@ -271,12 +221,16 @@ project-root/
 ├── test.js                                      ← starts mock, runs all flows, stops mock (npm test)
 └── dev/
     └── Postman/
-        ├── my-api.postman_collection.json       ← exported from Postman (File → Export → Collection v2.1)
-        ├── environment.postman_environment.json ← exported from Postman (Environments → Export)
-        ├── run-flow.js                          ← assembles and runs a named flow
-        └── flows/
-            ├── org-creation.json               ← Organisation creation flow
-            └── member-invitation.json          ← Member invitation flow
+        ├── collection/
+        │   └── my-api.postman_collection.json   ← exported from Postman (File → Export → Collection v2.1)
+        ├── environments/
+        │   ├── environment.local.postman_environment.json
+        │   ├── environment.ci.postman_environment.json
+        │   └── environment.mock.postman_environment.json
+        ├── flows/
+        │   ├── org-creation.json               ← Organisation creation flow
+        │   └── member-invitation.json          ← Member invitation flow
+        └── run-flow.js                          ← assembles and runs a named flow
 ```
 
 ---
@@ -594,6 +548,57 @@ And if Postman ever ships Newman support for Flows on the free plan, delete
 
 The full implementation referenced in this post is at
 [github.com/marcelovani/postman-flows](https://github.com/marcelovani/postman-flows).
+
+---
+
+## Running the examples in this repo
+
+The collection ships with a local mock server so you can run every flow without
+a real API or a Postman account.
+
+**Prerequisites:** Node.js 18+
+
+```bash
+git clone https://github.com/marcelovani/postman-flows.git
+cd postman-flows
+npm install
+npm test
+```
+
+That's it. `npm test` starts the mock server, runs every flow, and shuts the server down.
+You should see both flows pass:
+
+```
+✅ Flow "Member invitation" passed.
+✅ Flow "Organisation creation" passed.
+```
+
+### Running a single flow
+
+```bash
+# Start the mock server in one terminal
+npm run mock
+
+# Run a specific flow in another terminal
+ENV=mock node dev/Postman/run-flow.js "Organisation creation"
+ENV=mock node dev/Postman/run-flow.js "Member invitation"
+```
+
+### Pointing at a real API
+
+Export your Postman collection to `dev/Postman/collection/` and your environment
+files to `dev/Postman/environments/`, then run:
+
+```bash
+# Local API (uses environments/environment.local.postman_environment.json)
+node dev/Postman/run-flow.js "Organisation creation"
+
+# CI (uses environments/environment.ci.postman_environment.json)
+ENV=ci node dev/Postman/run-flow.js "Organisation creation"
+```
+
+Set `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MEMBER_USERNAME`, and `MEMBER_PASSWORD` as
+environment variables (or GitHub Actions secrets) for the CI environment.
 
 [thread]: https://community.postman.com/t/use-postman-flows-in-ci-cd-github-actions/62677
 [gh-issue]: https://github.com/postmanlabs/postman-app-support/issues/11770

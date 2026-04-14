@@ -42,8 +42,8 @@ const envKey   = envFlag || process.env.ENV || 'local';
 // ---------------------------------------------------------------------------
 
 const root           = path.resolve(__dirname, '../..');
-const collectionFile = path.join(__dirname, 'my-api.postman_collection.json');
-const envFile        = path.join(__dirname, `environment.${envKey}.postman_environment.json`);
+const collectionFile = path.join(__dirname, 'collection/my-api.postman_collection.json');
+const envFile        = path.join(__dirname, `environments/environment.${envKey}.postman_environment.json`);
 const flowsDir       = path.join(__dirname, 'flows');
 const resultsDir     = path.join(root, 'tests/results/newman');
 
@@ -54,7 +54,7 @@ if (!fs.existsSync(collectionFile)) {
 
 if (!fs.existsSync(envFile)) {
   console.error(`Environment file not found: ${envFile}`);
-  console.error(`Expected one of: environment.local.postman_environment.json, environment.ci.postman_environment.json`);
+  console.error(`Expected one of: environments/environment.local.postman_environment.json, environments/environment.ci.postman_environment.json`);
   process.exit(1);
 }
 
