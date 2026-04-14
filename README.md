@@ -11,21 +11,20 @@ Here's how we got around it — without duplicating a single request.
 ## The Problem: We Wanted Flows, Not Just Folders
 
 Our backend exposes a JSON REST API. We use Postman to document and test every endpoint.
-After a while, we noticed that individual endpoint tests were only telling half the story.
-What we really needed to validate was *sequences* — the kind of flows a real client goes
-through:
+After a while, individual endpoint tests started feeling hollow. They told us each request
+worked — not whether the API held together as a system.
 
-- An organisation admin logs in
+What we really needed to validate was *sequences*. The kind of journey a real client goes through:
+
+- Admin logs in
 - Creates an organisation
 - Edits it
-- Views it to confirm the changes persisted
+- Views it to confirm the change persisted
 
-Or the invitation flow:
-
-- An organisation admin logs in and creates an organisation
-- An organisation member logs in
-- The organisation admin invites the member to join the organisation
-- The member accepts the invitation
+Or a more complex one involving two users — an admin who creates an organisation and sends
+an invitation, and a member who logs in separately and accepts it. Each step depends on
+the one before. The invitation ID from step four has to reach step five; the access token
+from step one has to reach every authenticated request after it.
 
 These aren't just endpoint tests. They're *user journeys* expressed as API calls.
 
@@ -65,12 +64,11 @@ Postman has a separate CLI tool (distinct from Newman) that includes a
 We're a small team. Enterprise pricing for a test-runner felt like a lot.
 
 We searched for workarounds. The [community thread on running Flows in CI/CD][thread]
-had been open since 2023 with no free solution in sight. The [GitHub issue][gh-issue]
-requesting Newman support for Flows had accumulated plenty of 👍 reactions but no
-resolution.
+had been open since 2023 with no free solution. The [GitHub issue][gh-issue] requesting
+Newman support for Flows had plenty of 👍 reactions and no resolution.
 
-The fallback recommendation everywhere was: *convert your Flows to a Collection and
-use Newman*.
+The fallback recommendation was the same everywhere: *convert your Flows to a Collection
+and use Newman*.
 
 Which brings us to the real problem.
 
@@ -183,7 +181,7 @@ active flow. The state management quickly becomes unmanageable.
 ## The Collection Structure
 
 Before diving into the solution, it helps to understand how the collection and
-repository are set up — this is the foundation everything else builds on.
+repository are organised.
 
 The Postman collection is cleanly split into two top-level folders:
 
@@ -324,13 +322,10 @@ const tempCollection = {
 newman.run({ collection: tempCollection, environment: envFile, ... });
 ```
 
-### Running the flows
+Run `npm test` to execute all flows — it starts the mock server, runs each flow in
+turn, and shuts the server down on exit. Or run a single flow against a running server:
 
 ```bash
-# Run all flows (starts and stops the mock server automatically)
-npm test
-
-# Run a single flow (requires mock server already running via `npm run mock`)
 ENV=mock node dev/Postman/run-flow.js "Organisation creation"
 ```
 
@@ -343,22 +338,10 @@ ENV=mock node dev/Postman/run-flow.js "Organisation creation"
 
 ```
 [test] Starting mock server on port 3000...
-[mock] Server listening at http://localhost:3000
-[mock] Endpoints:
-[mock]   POST   /api/auth/login
-[mock]   POST   /api/organisations
-[mock]   PATCH  /api/organisations/:id
-[mock]   GET    /api/organisations/:id
-[mock]   POST   /api/organisations/:id/invitations
-[mock]   POST   /api/invitations/:id/accept
 [test] Server is ready.
 
 ▶ Running flow: Member invitation
   Steps: Organisation admin login → Create Organisation → Organisation member login → Invite member → Accept invitation
-
-newman
-
-My API — Flow: Member invitation
 
 → Organisation admin login
   POST http://localhost:3000/api/auth/login [200 OK, 366B, 23ms]
@@ -370,88 +353,30 @@ My API — Flow: Member invitation
   ✓  Status code is 201
   ✓  Response has organisation id
 
-→ Organisation member login
-  POST http://localhost:3000/api/auth/login [200 OK, 368B, 1ms]
-  ✓  Status code is 200
-  ✓  Response has access_token
-
-→ Invite member
-  POST http://localhost:3000/api/organisations/org-8v7h0dxwmnyo0shv/invitations [201 Created, 349B, 2ms]
-  ✓  Status code is 201
-  ✓  Invitation created
-
-→ Accept invitation
-  POST http://localhost:3000/api/invitations/inv-i12wpdmtmnyo0sil/accept [200 OK, 294B, 3ms]
-  ✓  Status code is 200
+→ Organisation member login ... → Invite member ... → Accept invitation ...
 
 ┌─────────────────────────┬─────────────────┬─────────────────┐
 │                         │        executed │          failed │
 ├─────────────────────────┼─────────────────┼─────────────────┤
-│              iterations │               1 │               0 │
-├─────────────────────────┼─────────────────┼─────────────────┤
 │                requests │               5 │               0 │
 ├─────────────────────────┼─────────────────┼─────────────────┤
-│            test-scripts │               5 │               0 │
-├─────────────────────────┼─────────────────┼─────────────────┤
-│      prerequest-scripts │               0 │               0 │
-├─────────────────────────┼─────────────────┼─────────────────┤
 │              assertions │               9 │               0 │
-├─────────────────────────┴─────────────────┴─────────────────┤
-│ total run duration: 100ms                                   │
-├─────────────────────────────────────────────────────────────┤
-│ total data received: 556B (approx)                          │
-├─────────────────────────────────────────────────────────────┤
-│ average response time: 6ms [min: 1ms, max: 23ms, s.d.: 8ms] │
-└─────────────────────────────────────────────────────────────┘
+└─────────────────────────┴─────────────────┴─────────────────┘
 
 ✅ Flow "Member invitation" passed.
 
 ▶ Running flow: Organisation creation
   Steps: Organisation admin login → Create Organisation → Edit Organisation → View Organisation
 
-newman
-
-My API — Flow: Organisation creation
-
-→ Organisation admin login
-  POST http://localhost:3000/api/auth/login [200 OK, 366B, 16ms]
-  ✓  Status code is 200
-  ✓  Response has access_token
-
-→ Create Organisation
-  POST http://localhost:3000/api/organisations [201 Created, 368B, 2ms]
-  ✓  Status code is 201
-  ✓  Response has organisation id
-
-→ Edit Organisation
-  PATCH http://localhost:3000/api/organisations/org-02v22y3pmnyo0sx9 [200 OK, 373B, 2ms]
-  ✓  Status code is 200
-  ✓  Name was updated
-
-→ View Organisation
-  GET http://localhost:3000/api/organisations/org-02v22y3pmnyo0sx9 [200 OK, 373B, 1ms]
-  ✓  Status code is 200
-  ✓  Creator is a member
+→ Organisation admin login ... → Create Organisation ... → Edit Organisation ... → View Organisation ...
 
 ┌─────────────────────────┬─────────────────┬─────────────────┐
 │                         │        executed │          failed │
 ├─────────────────────────┼─────────────────┼─────────────────┤
-│              iterations │               1 │               0 │
-├─────────────────────────┼─────────────────┼─────────────────┤
 │                requests │               4 │               0 │
 ├─────────────────────────┼─────────────────┼─────────────────┤
-│            test-scripts │               4 │               0 │
-├─────────────────────────┼─────────────────┼─────────────────┤
-│      prerequest-scripts │               0 │               0 │
-├─────────────────────────┼─────────────────┼─────────────────┤
 │              assertions │               8 │               0 │
-├─────────────────────────┴─────────────────┴─────────────────┤
-│ total run duration: 78ms                                    │
-├─────────────────────────────────────────────────────────────┤
-│ total data received: 531B (approx)                          │
-├─────────────────────────────────────────────────────────────┤
-│ average response time: 5ms [min: 1ms, max: 16ms, s.d.: 6ms] │
-└─────────────────────────────────────────────────────────────┘
+└─────────────────────────┴─────────────────┴─────────────────┘
 
 ✅ Flow "Organisation creation" passed.
 
@@ -491,15 +416,11 @@ next run.
 
 ## What We Gained
 
-- **No duplication.** Requests are defined once. Flows are just ordered lists of names.
-- **Works on the free plan.** No Newman patches, no Enterprise subscription, no
-  cloud execution required.
-- **Postman Flows still usable for design.** We kept the visual canvas for
-  diagramming and documentation. The runner handles execution.
-- **CI-friendly.** JUnit XML and HTML reports are generated for every flow run and
-  uploaded as artifacts.
-- **Self-discoverable.** `npm test` finds new flows automatically —
-  adding a flow to CI is a one-file change.
+- **No duplication.** Every request is defined exactly once. Flows are just ordered lists of names that reference it.
+- **Free plan only.** No Newman patches, no Enterprise subscription, no cloud execution required.
+- **Postman Flows canvas still works for design.** We kept using it to diagram and document flows — just not to run them.
+- **CI-friendly.** JUnit XML and HTML reports are generated per flow and uploaded as artifacts.
+- **Self-discoverable.** Drop a new `.json` file into `dev/Postman/flows/` and `npm test` picks it up automatically — no other changes needed.
 
 ---
 
