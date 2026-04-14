@@ -480,6 +480,9 @@ If you're in the same position, hopefully this saves you a few hours of searchin
 And if Postman ever ships Newman support for Flows on the free plan, delete
 `run-flow.js` and don't look back.
 
+The full implementation referenced in this post is at
+[github.com/marcelovani/postman-flows](https://github.com/marcelovani/postman-flows).
+
 [thread]: https://community.postman.com/t/use-postman-flows-in-ci-cd-github-actions/62677
 [gh-issue]: https://github.com/postmanlabs/postman-app-support/issues/11770
 [flows-docs]: https://learning.postman.com/docs/postman-flows/tutorials/video/create-first-flow
