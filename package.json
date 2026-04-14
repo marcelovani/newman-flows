@@ -3,10 +3,8 @@
   "version": "1.0.0",
   "description": "Workaround for running Postman Flows in CI without Enterprise",
   "scripts": {
-    "mock": "node mock-server.js",
-    "test:mock": "make test-newman-mock",
-    "test:newman": "make test-newman",
-    "test:newman:flows": "make test-newman-flows"
+    "test": "node test.js",
+    "mock": "node mock-server.js"
   },
   "dependencies": {
     "express": "^5.2.1",

@@ -19,30 +19,26 @@ a real API or a Postman account.
 git clone https://github.com/marcelovani/postman-flows.git
 cd postman-flows
 npm install
-
-# Start the mock server and run all flows in one command
-npm run test:mock
+npm test
 ```
 
-That's it. You should see both flows pass:
+That's it. `npm test` starts the mock server, runs every flow, and shuts the server down.
+You should see both flows pass:
 
 ```
 ✅ Flow "Member invitation" passed.
 ✅ Flow "Organisation creation" passed.
 ```
 
-### Running flows individually
+### Running a single flow
 
 ```bash
-# Terminal 1 — start the mock server
+# Start the mock server in one terminal
 npm run mock
 
-# Terminal 2 — run a specific flow
-ENV=mock make test-newman FLOW="Organisation creation"
-ENV=mock make test-newman FLOW="Member invitation"
-
-# Or run every flow at once
-ENV=mock make test-newman-flows
+# Run a specific flow in another terminal
+ENV=mock node dev/Postman/run-flow.js "Organisation creation"
+ENV=mock node dev/Postman/run-flow.js "Member invitation"
 ```
 
 ### Pointing at a real API
@@ -50,11 +46,11 @@ ENV=mock make test-newman-flows
 Export your Postman collection and environment, drop them into `dev/Postman/`, and run:
 
 ```bash
-# Local API
-make test-newman-flows
+# Local API (uses environment.local.postman_environment.json)
+node dev/Postman/run-flow.js "Organisation creation"
 
-# CI
-ENV=ci make test-newman-flows
+# CI (uses environment.ci.postman_environment.json)
+ENV=ci node dev/Postman/run-flow.js "Organisation creation"
 ```
 
 Set `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MEMBER_USERNAME`, and `MEMBER_PASSWORD` as
@@ -271,7 +267,8 @@ the same files you would use with a plain Newman run:
 
 ```
 project-root/
-├── Makefile                                     ← test-newman and test-newman-flows targets
+├── mock-server.js                               ← local Express mock API (npm run mock)
+├── test.js                                      ← starts mock, runs all flows, stops mock (npm test)
 └── dev/
     └── Postman/
         ├── my-api.postman_collection.json       ← exported from Postman (File → Export → Collection v2.1)
@@ -373,39 +370,14 @@ const tempCollection = {
 newman.run({ collection: tempCollection, environment: envFile, ... });
 ```
 
-### The Makefile
-
-```makefile
-# Run a specific flow
-test-newman:
-	@if [ -n "${FLOW}" ]; then \
-		node dev/Postman/run-flow.js "${FLOW}"; \
-	else \
-		npx newman run $(NEWMAN_COLLECTION) \
-			--folder Requests \
-			--environment $$NEWMAN_ENV \
-			--reporters cli,junit,htmlextra; \
-	fi
-
-# Run every flow in dev/Postman/flows/ automatically
-test-newman-flows:
-	@for flow_file in dev/Postman/flows/*.json; do \
-		flow_name=$$(node -e "process.stdout.write(require('./'+'$$flow_file').name)"); \
-		node dev/Postman/run-flow.js "$$flow_name" || exit 1; \
-	done
-```
-
-Usage from the command line:
+### Running the flows
 
 ```bash
-# Run all individual requests (smoke test)
-make test-newman
+# Run all flows (starts and stops the mock server automatically)
+npm test
 
-# Run a specific flow
-make test-newman FLOW="Organisation creation"
-
-# Run every flow (used in CI)
-make test-newman-flows
+# Run a single flow (requires mock server already running via `npm run mock`)
+ENV=mock node dev/Postman/run-flow.js "Organisation creation"
 ```
 
 ### The output
@@ -447,14 +419,11 @@ make test-newman-flows
 
 ## CI Integration
 
-In GitHub Actions, both the smoke test and the flows run automatically:
+In GitHub Actions, the flows run automatically with a single command:
 
 ```yaml
-- name: Run Newman — all requests (smoke test)
-  run: make test-newman
-
 - name: Run Newman — all flows
-  run: make test-newman-flows
+  run: npm test
 
 - name: Store Newman artifacts
   if: always()
@@ -465,9 +434,9 @@ In GitHub Actions, both the smoke test and the flows run automatically:
     retention-days: 5
 ```
 
-Adding a new flow requires no changes to `run-flow.js`, the Makefile, or the CI
-workflow. Drop a new `.json` file into `dev/Postman/flows/` and it's automatically
-picked up by `test-newman-flows` on the next run.
+Adding a new flow requires no changes to `run-flow.js` or the CI workflow. Drop a
+new `.json` file into `dev/Postman/flows/` and it's automatically picked up on the
+next run.
 
 <!-- SCREENSHOT 7: A passing GitHub Actions run showing the two Newman steps
      ("Run Newman — all requests" and "Run Newman — all flows") both with green
@@ -486,7 +455,7 @@ picked up by `test-newman-flows` on the next run.
   diagramming and documentation. The runner handles execution.
 - **CI-friendly.** JUnit XML and HTML reports are generated for every flow run and
   uploaded as artifacts.
-- **Self-discoverable.** `make test-newman-flows` finds new flows automatically —
+- **Self-discoverable.** `npm test` finds new flows automatically —
   adding a flow to CI is a one-file change.
 
 ---
@@ -526,9 +495,9 @@ stop reading this and use `postman flows run` — it's the right tool.
 
 But if you're on the free plan and need multi-step API flows in CI without duplicating
 request definitions, the underlying problem is solvable with the tools you already
-have. A small Node.js script, a handful of JSON files, and a Makefile target gets you
-most of the way there — just with none of the visual clarity that makes Flows worth
-reaching for in the first place.
+have. A small Node.js script and a handful of JSON files gets you most of the way
+there — just with none of the visual clarity that makes Flows worth reaching for in
+the first place.
 
 If you're in the same position, hopefully this saves you a few hours of searching.
 And if Postman ever ships Newman support for Flows on the free plan, delete
