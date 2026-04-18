@@ -33,6 +33,7 @@
     "build": "tsc -p tsconfig.build.json",
     "build:watch": "tsc -p tsconfig.build.json --watch",
     "clean": "rm -rf dist/",
+    "prepare": "test -d src && npm run build || true",
     "prepublishOnly": "npm run clean && npm run build",
     "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"test/**/*.ts\" \"*.ts\"",
     "lint:fix": "eslint --fix --no-error-on-unmatched-pattern \"src/**/*.ts\" \"test/**/*.ts\" \"*.ts\"",
