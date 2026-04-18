@@ -81,7 +81,7 @@ export function resolveCollectionPath(override?: string): string {
 
   const dir = path.join(process.cwd(), POSTMAN_DIR);
   if (fs.existsSync(dir)) {
-    const match = fs.readdirSync(dir).find((f) => f.endsWith('.postman_collection.json'));
+    const match = fs.readdirSync(dir).sort().find((f) => f.endsWith('.postman_collection.json'));
     if (match) return path.join(dir, match);
   }
 
@@ -106,7 +106,7 @@ export function resolveEnvironmentPath(override?: string): string | undefined {
   const dir = path.join(process.cwd(), POSTMAN_DIR);
   if (!fs.existsSync(dir)) return undefined;
 
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.postman_environment.json'));
+  const files = fs.readdirSync(dir).sort().filter((f) => f.endsWith('.postman_environment.json'));
   if (files.length === 0) return undefined;
 
   const devTool = process.env['DEV_TOOL'] ?? 'ddev';
