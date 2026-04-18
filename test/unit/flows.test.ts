@@ -6,24 +6,22 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { extractFlowDef, findFlowRequest, listFlows } from '../../src/lib/flows.js';
+import { extractFlowDef, findFlowRequest, listFlows, runSandboxed } from '../../src/lib/flows.js';
 import type { PostmanCollection, PostmanItem } from '../../src/lib/types.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeFlowRequest(name: string, steps: string[]): PostmanItem {
+function makeFlowRequest(name: string, steps: string[], execLines?: string[]): PostmanItem {
+  const exec = execLines ?? [`steps(${JSON.stringify(steps)});`];
   return {
     name,
     request: { method: 'FLOW', url: { raw: 'about:blank' } },
     event: [
       {
         listen: 'prerequest',
-        script: {
-          type: 'text/javascript',
-          exec: [`steps(${JSON.stringify(steps)});`],
-        },
+        script: { type: 'text/javascript', exec },
       },
     ],
   };
@@ -38,6 +36,96 @@ function makeCollection(flowItems: PostmanItem[], extraItems: PostmanItem[] = []
     ],
   };
 }
+
+// ---------------------------------------------------------------------------
+// runSandboxed — vm hardening
+// ---------------------------------------------------------------------------
+
+describe('runSandboxed', () => {
+  it('captures a valid steps() call', () => {
+    expect(runSandboxed('My Flow', "steps(['Login', 'Create Org']);")).toEqual(['Login', 'Create Org']);
+  });
+
+  it('rejects scripts that reference "constructor"', () => {
+    expect(() =>
+      runSandboxed('Attack', "steps.constructor.constructor('return process')();"),
+    ).toThrow('forbidden identifier');
+  });
+
+  it('rejects scripts that reference "process"', () => {
+    expect(() =>
+      runSandboxed('Attack', 'var p = process; steps(["a"]);'),
+    ).toThrow('forbidden identifier');
+  });
+
+  it('rejects scripts that reference "require"', () => {
+    expect(() =>
+      runSandboxed('Attack', 'require("fs"); steps(["a"]);'),
+    ).toThrow('forbidden identifier');
+  });
+
+  it('rejects scripts that reference "eval"', () => {
+    expect(() =>
+      runSandboxed('Attack', 'eval("steps([\'a\'])");'),
+    ).toThrow('forbidden identifier');
+  });
+
+  it('rejects scripts that reference "Function"', () => {
+    expect(() =>
+      runSandboxed('Attack', 'new Function("return process")();'),
+    ).toThrow('forbidden identifier');
+  });
+
+  it('allows step names that contain forbidden words as substrings inside strings', () => {
+    // "Create prototype" — "prototype" is inside a string literal, not an identifier
+    expect(runSandboxed('My Flow', "steps(['Create prototype', 'Login']);")).toEqual([
+      'Create prototype',
+      'Login',
+    ]);
+  });
+
+  it('enforces a 1-second timeout on infinite loops', () => {
+    expect(() =>
+      runSandboxed('Hang', 'while(true){}'),
+    ).toThrow(); // script timed out or forbidden pattern match
+  }, 3000);
+
+  it('throws when steps() receives a non-array', () => {
+    expect(() =>
+      runSandboxed('Bad', 'steps("not an array");'),
+    ).toThrow('must be an array');
+  });
+
+  it('throws when steps() receives an array with non-string elements', () => {
+    expect(() =>
+      runSandboxed('Bad', 'steps([123, "Login"]);'),
+    ).toThrow('must contain only strings');
+  });
+
+  it('throws when steps() receives an array with an empty string', () => {
+    expect(() =>
+      runSandboxed('Bad', 'steps(["Login", "", "View"]);'),
+    ).toThrow('must not contain empty strings');
+  });
+
+  it('throws when steps() is not called', () => {
+    expect(() =>
+      runSandboxed('Bad', '// just a comment'),
+    ).toThrow('No valid steps() call');
+  });
+
+  it('throws when steps() is called with an empty array', () => {
+    expect(() =>
+      runSandboxed('Bad', 'steps([]);'),
+    ).toThrow('No valid steps() call');
+  });
+
+  it('throws on a syntax error in the script', () => {
+    expect(() =>
+      runSandboxed('Bad', 'steps([broken;;;'),
+    ).toThrow('Failed to evaluate');
+  });
+});
 
 // ---------------------------------------------------------------------------
 // listFlows
@@ -88,27 +176,14 @@ describe('extractFlowDef', () => {
   });
 
   it('handles multi-line pre-request scripts', () => {
-    const req: PostmanItem = {
-      name: 'Multi-line',
-      request: { method: 'FLOW', url: { raw: 'about:blank' } },
-      event: [
-        {
-          listen: 'prerequest',
-          script: {
-            type: 'text/javascript',
-            exec: [
-              '// Run: newman-flows run "Multi-line"',
-              'steps([',
-              '  "Step One",',
-              '  "Step Two"',
-              ']);',
-            ],
-          },
-        },
-      ],
-    };
-    const def = extractFlowDef(req);
-    expect(def.steps).toEqual(['Step One', 'Step Two']);
+    const req = makeFlowRequest('Multi-line', [], [
+      '// Run: newman-flows run "Multi-line"',
+      'steps([',
+      '  "Step One",',
+      '  "Step Two"',
+      ']);',
+    ]);
+    expect(extractFlowDef(req).steps).toEqual(['Step One', 'Step Two']);
   });
 
   it('throws when the pre-request script is missing', () => {
@@ -120,16 +195,7 @@ describe('extractFlowDef', () => {
   });
 
   it('throws when the script has no steps() call', () => {
-    const req: PostmanItem = {
-      name: 'No Steps',
-      request: { method: 'FLOW', url: { raw: 'about:blank' } },
-      event: [
-        {
-          listen: 'prerequest',
-          script: { type: 'text/javascript', exec: ['// no steps() here'] },
-        },
-      ],
-    };
+    const req = makeFlowRequest('No Steps', [], ['// no steps() here']);
     expect(() => extractFlowDef(req)).toThrow('No valid steps() call');
   });
 
@@ -138,17 +204,23 @@ describe('extractFlowDef', () => {
     expect(() => extractFlowDef(req)).toThrow('No valid steps() call');
   });
 
+  it('throws when steps() contains a non-string value', () => {
+    const req = makeFlowRequest('Bad', [], ['steps([123, "Login"]);']);
+    expect(() => extractFlowDef(req)).toThrow('must contain only strings');
+  });
+
+  it('throws when steps() contains an empty string', () => {
+    const req = makeFlowRequest('Bad', [], ['steps(["Login", ""]);']);
+    expect(() => extractFlowDef(req)).toThrow('must not contain empty strings');
+  });
+
+  it('throws when the script references a forbidden identifier', () => {
+    const req = makeFlowRequest('Bad', [], ['steps.constructor.constructor("return process")();']);
+    expect(() => extractFlowDef(req)).toThrow('forbidden identifier');
+  });
+
   it('throws when the script has a syntax error', () => {
-    const req: PostmanItem = {
-      name: 'Bad Script',
-      request: { method: 'FLOW', url: { raw: 'about:blank' } },
-      event: [
-        {
-          listen: 'prerequest',
-          script: { type: 'text/javascript', exec: ['steps([broken syntax;;;'] },
-        },
-      ],
-    };
+    const req = makeFlowRequest('Bad', [], ['steps([broken syntax;;;']);
     expect(() => extractFlowDef(req)).toThrow('Failed to evaluate');
   });
 });
@@ -181,30 +253,20 @@ describe('findFlowRequest', () => {
 describe('buildTempCollection', () => {
   it('assembles steps in the declared order', async () => {
     const { buildTempCollection } = await import('../../src/commands/run.js');
-    const stepA: PostmanItem = {
-      name: 'Step A',
-      request: { method: 'GET', url: { raw: 'http://x/a' } },
-    };
-    const stepB: PostmanItem = {
-      name: 'Step B',
-      request: { method: 'POST', url: { raw: 'http://x/b' } },
-    };
-    const collection = makeCollection([], [
-      { name: 'Requests', item: [stepA, stepB] },
-    ]);
+    const stepA: PostmanItem = { name: 'Step A', request: { method: 'GET', url: { raw: 'http://x/a' } } };
+    const stepB: PostmanItem = { name: 'Step B', request: { method: 'POST', url: { raw: 'http://x/b' } } };
+    const collection = makeCollection([], [{ name: 'Requests', item: [stepA, stepB] }]);
     const temp = buildTempCollection(collection, { name: 'My Flow', steps: ['Step A', 'Step B'] });
     expect((temp.item as PostmanItem[])[0].name).toBe('Step A');
     expect((temp.item as PostmanItem[])[1].name).toBe('Step B');
   });
 
-  it('strips _flow_steps events from collection-level events', async () => {
+  it('strips events whose script references _flow_steps as an identifier', async () => {
     const { buildTempCollection } = await import('../../src/commands/run.js');
     const collection: PostmanCollection = {
       info: { name: 'Test', schema: 'x' },
       item: [
-        { name: 'Requests', item: [
-          { name: 'Step A', request: { method: 'GET', url: { raw: 'http://x/a' } } },
-        ]},
+        { name: 'Requests', item: [{ name: 'Step A', request: { method: 'GET', url: { raw: 'http://x/a' } } }] },
         { name: 'Flows', item: [] },
       ],
       event: [
@@ -216,6 +278,29 @@ describe('buildTempCollection', () => {
     const events = temp.event as typeof collection.event;
     expect(events).toHaveLength(1);
     expect(events?.[0].listen).toBe('test');
+  });
+
+  it('does NOT strip events that mention _flow_steps inside a string literal', async () => {
+    const { buildTempCollection } = await import('../../src/commands/run.js');
+    const collection: PostmanCollection = {
+      info: { name: 'Test', schema: 'x' },
+      item: [
+        { name: 'Requests', item: [{ name: 'Step A', request: { method: 'GET', url: { raw: 'http://x/a' } } }] },
+        { name: 'Flows', item: [] },
+      ],
+      event: [
+        {
+          listen: 'test',
+          script: {
+            type: 'text/javascript',
+            exec: ['pm.test("check _flow_steps is not set", () => { pm.expect(pm.globals.get("_flow_steps")).to.be.undefined; });'],
+          },
+        },
+      ],
+    };
+    const temp = buildTempCollection(collection, { name: 'My Flow', steps: ['Step A'] });
+    const events = temp.event as typeof collection.event;
+    expect(events).toHaveLength(1); // should NOT be filtered out
   });
 
   it('throws when a step name is not found in the collection', async () => {

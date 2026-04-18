@@ -182,6 +182,14 @@ expect(result).toBe(path.join(tmpDir, 'relative/col.json'));
     expect(resolveCollectionPath()).toContain('My API.postman_collection.json');
   });
 
+  it('returns the alphabetically first collection when multiple exist', () => {
+    const dir = path.join(tmpDir, 'dev', 'Postman');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'beta.postman_collection.json'), '{}');
+    fs.writeFileSync(path.join(dir, 'alpha.postman_collection.json'), '{}');
+    expect(resolveCollectionPath()).toContain('alpha.postman_collection.json');
+  });
+
   it('throws when no collection can be found', () => {
     expect(() => resolveCollectionPath()).toThrow('No collection file found');
   });

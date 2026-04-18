@@ -118,5 +118,6 @@ describe('validateCollection (integration)', () => {
     const collection = loadCollection(COLLECTION_PATH);
     const result = validateCollection(collection);
     expect(result.errors).toHaveLength(0);
+    expect(Object.keys(result.validFlows)).toHaveLength(2); // Organisation creation + Member invitation
   });
 });
