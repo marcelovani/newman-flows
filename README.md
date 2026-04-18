@@ -5,6 +5,7 @@
 `newman-flows` sits on top of [Newman](https://github.com/postmanlabs/newman) and adds the one thing Newman doesn't have: **flows**. A flow is an ordered sequence of named requests drawn from your Postman collection. Each request is defined exactly once; a flow just lists the steps to run and in what order.
 
 ```bash
+npx newman-flows list
 npx newman-flows run "Org admin creates org"
 npx newman-flows run --all
 npx newman-flows validate
@@ -73,6 +74,25 @@ npx newman-flows run --all \
 npx newman-flows run --all --results-dir ./ci-reports
 ```
 
+### List flows
+
+Prints every flow in the collection with its step count — useful for discovering what's available before running:
+
+```bash
+npx newman-flows list
+npx newman-flows list --collection ./dev/Postman/my-api.postman_collection.json
+```
+
+Example output:
+
+```
+Flows in "My API":
+
+  • Org admin creates org       (4 steps)
+  • Invite member to org        (5 steps)
+  • User Updates password       (4 steps)
+```
+
 ### Validate the collection
 
 Checks that all flow definitions are well-formed and every step name resolves to a real request:
@@ -87,6 +107,7 @@ npx newman-flows validate --collection ./dev/Postman/my-api.postman_collection.j
 ```json
 {
   "scripts": {
+    "list:flows": "newman-flows list",
     "test:flow": "newman-flows run",
     "test:flows": "newman-flows run --all",
     "validate:collection": "newman-flows validate"
@@ -95,6 +116,7 @@ npx newman-flows validate --collection ./dev/Postman/my-api.postman_collection.j
 ```
 
 ```bash
+npm run list:flows
 npm run test:flow -- "Org admin creates org"
 npm run test:flows
 npm run validate:collection
