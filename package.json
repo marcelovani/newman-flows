@@ -10,7 +10,7 @@
     "postman-flows",
     "cli"
   ],
-  "author": "Marcelo Vani <marcelo@legalconnection.co> (https://github.com/marcelovani)",
+  "author": "Marcelo Vani (https://github.com/marcelovani)",
   "license": "Apache-2.0",
   "homepage": "https://github.com/marcelovani/newman-flows#readme",
   "repository": {
