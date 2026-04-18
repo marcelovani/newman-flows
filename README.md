@@ -193,6 +193,51 @@ Results are written to `tests/results/newman/`:
 
 ---
 
+## Development
+
+### Testing the global install locally
+
+Use `npm link` to symlink the local package into the global bin without touching the npm registry. The `prepare` script builds automatically:
+
+```bash
+npm link
+
+newman-flows --version
+newman-flows --help
+newman-flows run --all --collection ./path/to/collection.json
+```
+
+To unlink when done:
+
+```bash
+npm unlink -g newman-flows
+```
+
+Alternatively, `npm pack` produces a tarball you can install anywhere — useful for testing what consumers will actually receive:
+
+```bash
+npm pack                                   # produces newman-flows-x.y.z.tgz
+npm install -g ./newman-flows-x.y.z.tgz
+newman-flows --version
+```
+
+### Tagging and releasing
+
+```bash
+# 1. Bump the version (updates package.json and creates a git tag)
+npm version patch   # or minor / major
+
+# 2. Push the commit and tag
+git push origin newman-flows --follow-tags
+
+# 3. Publish (builds automatically via prepublishOnly, then publishes)
+npm publish
+```
+
+CI will automate step 3 in Phase 4: a `publish.yml` workflow triggers on `v*` tag pushes, runs the full test suite, then calls `npm publish` using an `NPM_TOKEN` secret stored in the GitHub repository settings.
+
+---
+
 ## Background
 
 For the full story on why this tool exists — the Postman Enterprise paywall, why Newman folders don't solve the problem, and how the temporary-collection approach works — see [medium-post.md](medium-post.md) or the published article on Medium.
