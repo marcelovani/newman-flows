@@ -81,11 +81,18 @@ export function resolveCollectionPath(override?: string): string {
 
   const dir = path.join(process.cwd(), POSTMAN_DIR);
   if (fs.existsSync(dir)) {
-    const match = fs
+    const matches = fs
       .readdirSync(dir)
       .sort()
-      .find((f) => f.endsWith('.postman_collection.json'));
-    if (match) return path.join(dir, match);
+      .filter((f) => f.endsWith('.postman_collection.json'));
+    if (matches.length > 1) {
+      console.warn(
+        `Warning: multiple collection files found in ${POSTMAN_DIR}/:\n` +
+          matches.map((f) => `  ${f}`).join('\n') +
+          `\nUsing "${matches[0]}". Pass --collection <path> to select a different one.`,
+      );
+    }
+    if (matches.length > 0) return path.join(dir, matches[0]);
   }
 
   throw new Error(
@@ -115,6 +122,14 @@ export function resolveEnvironmentPath(override?: string): string | undefined {
     .sort()
     .filter((f) => f.endsWith('.postman_environment.json'));
   if (files.length === 0) return undefined;
+
+  if (files.length > 1) {
+    console.warn(
+      `Warning: multiple environment files found in ${POSTMAN_DIR}/:\n` +
+        files.map((f) => `  ${f}`).join('\n') +
+        `\nUsing "${files[0]}". Pass --env <path> to select a different one.`,
+    );
+  }
 
   return path.join(dir, files[0]);
 }

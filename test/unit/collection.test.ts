@@ -9,7 +9,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   findFolder,
   findRequest,
@@ -29,18 +29,14 @@ const items: PostmanItem[] = [
     item: [
       {
         name: 'Authentication',
-        item: [
-          { name: 'Login', request: { method: 'POST', url: { raw: 'http://x/login' } } },
-        ],
+        item: [{ name: 'Login', request: { method: 'POST', url: { raw: 'http://x/login' } } }],
       },
       { name: 'Get User', request: { method: 'GET', url: { raw: 'http://x/user' } } },
     ],
   },
   {
     name: 'Flows',
-    item: [
-      { name: 'Onboarding', request: { method: 'FLOW', url: { raw: 'about:blank' } } },
-    ],
+    item: [{ name: 'Onboarding', request: { method: 'FLOW', url: { raw: 'about:blank' } } }],
   },
 ];
 
@@ -172,7 +168,7 @@ describe('resolveCollectionPath', () => {
 
   it('resolves a relative override against cwd', () => {
     const result = resolveCollectionPath('relative/col.json');
-expect(result).toBe(path.join(tmpDir, 'relative/col.json'));
+    expect(result).toBe(path.join(tmpDir, 'relative/col.json'));
   });
 
   it('auto-discovers a *.postman_collection.json in dev/Postman/', () => {
@@ -182,12 +178,18 @@ expect(result).toBe(path.join(tmpDir, 'relative/col.json'));
     expect(resolveCollectionPath()).toContain('My API.postman_collection.json');
   });
 
-  it('returns the alphabetically first collection when multiple exist', () => {
+  it('returns the alphabetically first collection when multiple exist and warns', () => {
     const dir = path.join(tmpDir, 'dev', 'Postman');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'beta.postman_collection.json'), '{}');
     fs.writeFileSync(path.join(dir, 'alpha.postman_collection.json'), '{}');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(resolveCollectionPath()).toContain('alpha.postman_collection.json');
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toContain('multiple collection files found');
+    expect(warn.mock.calls[0][0]).toContain('alpha.postman_collection.json');
+    expect(warn.mock.calls[0][0]).toContain('--collection');
+    warn.mockRestore();
   });
 
   it('throws when no collection can be found', () => {
@@ -229,11 +231,17 @@ describe('resolveEnvironmentPath', () => {
     expect(resolveEnvironmentPath()).toContain('my-env.postman_environment.json');
   });
 
-  it('returns the alphabetically first file when multiple exist', () => {
+  it('returns the alphabetically first file when multiple exist and warns', () => {
     const dir = path.join(tmpDir, 'dev', 'Postman');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'staging.postman_environment.json'), '{}');
     fs.writeFileSync(path.join(dir, 'local.postman_environment.json'), '{}');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(resolveEnvironmentPath()).toContain('local.postman_environment.json');
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toContain('multiple environment files found');
+    expect(warn.mock.calls[0][0]).toContain('local.postman_environment.json');
+    expect(warn.mock.calls[0][0]).toContain('--env');
+    warn.mockRestore();
   });
 });
