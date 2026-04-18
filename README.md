@@ -188,13 +188,49 @@ Export the collection from Postman desktop (`File → Export → Collection v2.1
 
 ---
 
-## Collection path
+## File discovery
 
-By default `newman-flows` looks for a `*.postman_collection.json` file in `<cwd>/dev/Postman/`. Override with a flag:
+`newman-flows` resolves the collection and environment from `process.cwd()` — the directory you run the command from. When used via `npm run`, that is always the project root.
+
+### Collection
+
+Resolution order:
+
+1. `--collection <path>` flag (absolute or relative to cwd)
+2. First `*.postman_collection.json` found in `<cwd>/dev/Postman/` (alphabetical — deterministic when multiple files exist)
+3. Error with a helpful message
 
 ```bash
+# Auto-discovered from dev/Postman/
+npx newman-flows run --all
+
+# Explicit override
 npx newman-flows run --all --collection ./path/to/my.postman_collection.json
 ```
+
+### Environment
+
+Resolution order:
+
+1. `--env <path>` flag (absolute or relative to cwd)
+2. `DEV_TOOL` env var selects which file to prefer:
+   - Any value containing `docker` (e.g. `docker`, `docker-compose`) → first file whose name contains `docker` (case-insensitive)
+   - Anything else (or unset) → first file whose name contains `ddev` (case-insensitive)
+3. First `*.postman_environment.json` in `<cwd>/dev/Postman/` (alphabetical fallback)
+4. No environment file — Newman runs without one
+
+```bash
+# Default: picks a file containing "ddev" in its name
+npx newman-flows run --all
+
+# Docker / docker-compose environment
+DEV_TOOL=docker-compose npx newman-flows run --all
+
+# Explicit path — bypasses all auto-discovery
+npx newman-flows run --all --env ./dev/Postman/staging.postman_environment.json
+```
+
+The keyword matching is intentionally loose so names like `"Drupal Ddev …"` and `"Drupal Docker …"` are found without needing an exact prefix.
 
 ---
 
