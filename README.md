@@ -223,18 +223,46 @@ newman-flows --version
 
 ### Tagging and releasing
 
+See [New releases](#new-releases) below.
+
+---
+
+## New releases
+
+Releases are published to npm automatically when a version tag is pushed. The CI pipeline ([`.github/workflows/publish.yml`](.github/workflows/publish.yml)) runs the full test suite first — if anything fails, nothing is published.
+
+### Prerequisites (one-time setup)
+
+Add an `NPM_TOKEN` secret to the GitHub repository:
+
+1. Go to [npmjs.com](https://www.npmjs.com) → **Access Tokens → Generate New Token → Automation**
+2. Copy the token
+3. In GitHub: **Settings → Secrets and variables → Actions → New repository secret**
+   - Name: `NPM_TOKEN`
+   - Value: the token from step 2
+
+### Releasing a new version
+
 ```bash
-# 1. Bump the version (updates package.json and creates a git tag)
-npm version patch   # or minor / major
+# 1. Bump the version — updates package.json, commits, and creates a git tag
+npm version patch   # or: minor / major
 
-# 2. Push the commit and tag
+# 2. Push the commit and the tag — this triggers the publish workflow
 git push origin newman-flows --follow-tags
-
-# 3. Publish (builds automatically via prepublishOnly, then publishes)
-npm publish
 ```
 
-CI will automate step 3 in Phase 4: a `publish.yml` workflow triggers on `v*` tag pushes, runs the full test suite, then calls `npm publish` using an `NPM_TOKEN` secret stored in the GitHub repository settings.
+The workflow builds the package, runs lint + typecheck + unit + integration tests, then publishes to npm with [provenance attestation](https://docs.npmjs.com/generating-provenance-statements) — a verified link between the published package and this exact git commit, shown as a badge on npmjs.com.
+
+### First publish
+
+The automated workflow requires the package name to already exist on npm. Run the first publish manually:
+
+```bash
+npm run build
+npm publish --access public
+```
+
+All subsequent releases go through the tag → CI → npm pipeline.
 
 ---
 
