@@ -61,7 +61,6 @@ describe('runFlow', () => {
         collection: COLLECTION_PATH,
         flow: 'Organisation creation',
         env: envPath,
-        resultsDir: path.join(tmpDir, 'results-org'),
       }),
     ).resolves.toBeUndefined();
   }, 30_000);
@@ -73,7 +72,6 @@ describe('runFlow', () => {
         collection: COLLECTION_PATH,
         flow: 'Member invitation',
         env: envPath,
-        resultsDir: path.join(tmpDir, 'results-inv'),
       }),
     ).resolves.toBeUndefined();
   }, 30_000);
@@ -101,7 +99,6 @@ describe('runAllFlows', () => {
       runAllFlows({
         collection: COLLECTION_PATH,
         env: envPath,
-        resultsDir: path.join(tmpDir, 'results-all'),
       }),
     ).resolves.toBeUndefined();
   }, 60_000);
