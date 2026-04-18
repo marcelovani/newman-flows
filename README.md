@@ -68,10 +68,13 @@ npx newman-flows run --all \
   --collection ./dev/Postman/my-api.postman_collection.json
 ```
 
-### Write reports to a custom directory
+### Save reports
 
 ```bash
-npx newman-flows run --all --results-dir ./ci-reports
+npx newman-flows run --all \
+  --reporters cli,junit,htmlextra \
+  --reporter-junit-export ./test/results/newman/results.xml \
+  --reporter-htmlextra-export ./test/results/newman/report.html
 ```
 
 ### List flows
@@ -225,16 +228,50 @@ When your project has multiple environment files (local, staging, CI, etc.), pas
 
 ## Reports
 
-JUnit XML and HTML reports are written to `test/results/newman/` by default. Override with `--results-dir`:
+`newman-flows` does not manage reporters — it passes your reporter configuration straight to Newman. By default only the `cli` reporter runs and nothing is written to disk.
+
+To save reports, pass the same reporter flags you would use with Newman directly:
 
 ```bash
-npx newman-flows run --all --results-dir ./ci-reports
+# JUnit XML only
+npx newman-flows run --all \
+  --reporters cli,junit \
+  --reporter-junit-export ./test/results/newman/results.xml
+
+# JUnit XML + HTML report
+npx newman-flows run --all \
+  --reporters cli,junit,htmlextra \
+  --reporter-junit-export ./test/results/newman/results.xml \
+  --reporter-htmlextra-export ./test/results/newman/report.html
+
+# JSON report
+npx newman-flows run --all \
+  --reporters cli,json \
+  --reporter-json-export ./test/results/newman/results.json
 ```
 
-| File          | Format                     |
-| ------------- | -------------------------- |
-| `results.xml` | JUnit XML (consumed by CI) |
-| `report.html` | Human-readable HTML report |
+The output directory must exist before running, or you can create it in the same command:
+
+```bash
+mkdir -p test/results/newman && npx newman-flows run --all \
+  --reporters cli,junit \
+  --reporter-junit-export ./test/results/newman/results.xml
+```
+
+### Programmatic API
+
+Pass `reporters` and `reporter` directly — they map 1-to-1 to Newman's own options:
+
+```typescript
+await runAllFlows({
+  collection: './dev/Postman/my-api.postman_collection.json',
+  reporters: ['cli', 'junit', 'htmlextra'],
+  reporter: {
+    junit:     { export: './test/results/newman/results.xml' },
+    htmlextra: { export: './test/results/newman/report.html' },
+  },
+});
+```
 
 ---
 
@@ -242,7 +279,11 @@ npx newman-flows run --all --results-dir ./ci-reports
 
 ```yaml
 - name: Run all flows
-  run: npx newman-flows run --all --results-dir ./test/results/newman
+  run: |
+    mkdir -p test/results/newman
+    npx newman-flows run --all \
+      --reporters cli,junit \
+      --reporter-junit-export ./test/results/newman/results.xml
 
 - name: Upload flow reports
   if: always()
