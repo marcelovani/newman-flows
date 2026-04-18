@@ -14,10 +14,10 @@
  */
 
 import { Command } from 'commander';
-import { runAllFlows, runFlow } from './commands/run.js';
-import { loadCollection, resolveCollectionPath } from './lib/collection.js';
-import { printValidationResult, validateCollection } from './commands/validate.js';
 import pkg from '../package.json';
+import { runAllFlows, runFlow } from './commands/run.js';
+import { printValidationResult, validateCollection } from './commands/validate.js';
+import { loadCollection, resolveCollectionPath } from './lib/collection.js';
 
 const program = new Command();
 
@@ -37,36 +37,41 @@ program
   .option('--collection <path>', 'path to the Postman collection JSON file')
   .option('--env <path>', 'path to a Postman environment JSON file')
   .option('--results-dir <path>', 'directory for junit XML and HTML reports')
-  .action(async (flowName: string | undefined, opts: {
-    all?: boolean;
-    collection?: string;
-    env?: string;
-    resultsDir?: string;
-  }) => {
-    try {
-      if (opts.all) {
-        await runAllFlows({
-          collection: resolveCollectionPath(opts.collection),
-          env: opts.env,
-          resultsDir: opts.resultsDir,
-        });
-      } else if (flowName) {
-        await runFlow({
-          collection: resolveCollectionPath(opts.collection),
-          flow: flowName,
-          env: opts.env,
-          resultsDir: opts.resultsDir,
-        });
-      } else {
-        console.error('Provide a flow name or --all.\n');
-        program.commands.find((c) => c.name() === 'run')?.help();
+  .action(
+    async (
+      flowName: string | undefined,
+      opts: {
+        all?: boolean;
+        collection?: string;
+        env?: string;
+        resultsDir?: string;
+      },
+    ) => {
+      try {
+        if (opts.all) {
+          await runAllFlows({
+            collection: resolveCollectionPath(opts.collection),
+            env: opts.env,
+            resultsDir: opts.resultsDir,
+          });
+        } else if (flowName) {
+          await runFlow({
+            collection: resolveCollectionPath(opts.collection),
+            flow: flowName,
+            env: opts.env,
+            resultsDir: opts.resultsDir,
+          });
+        } else {
+          console.error('Provide a flow name or --all.\n');
+          program.commands.find((c) => c.name() === 'run')?.help();
+          process.exit(1);
+        }
+      } catch (err) {
+        console.error((err as Error).message ?? err);
         process.exit(1);
       }
-    } catch (err) {
-      console.error((err as Error).message ?? err);
-      process.exit(1);
-    }
-  });
+    },
+  );
 
 // ---------------------------------------------------------------------------
 // validate subcommand
@@ -81,7 +86,7 @@ program
       const collectionPath = resolveCollectionPath(opts.collection);
       const collection = loadCollection(collectionPath);
       const result = validateCollection(collection);
-      const valid = printValidationResult(result, collection);
+      const valid = printValidationResult(result);
       if (!valid) process.exit(1);
     } catch (err) {
       console.error((err as Error).message ?? err);

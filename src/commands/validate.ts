@@ -9,14 +9,14 @@
  *   - All step names in flow definitions resolve to a real request
  *   - No duplicate request names (causes ambiguous step resolution)
  *
- * The core validateCollection() function is pure — it returns errors and
- * warnings without printing or exiting. The CLI wrapper decides what to do
- * with the result.
+ * The core validateCollection() function is pure — it returns errors,
+ * warnings, and per-flow step counts without printing or exiting. The CLI
+ * wrapper (printValidationResult) decides what to do with the result.
  */
 
 import * as path from 'path';
-import * as vm from 'vm';
 import { findFolder } from '../lib/collection.js';
+import { runSandboxed } from '../lib/flows.js';
 import type { PostmanCollection, PostmanItem } from '../lib/types.js';
 
 // ---------------------------------------------------------------------------
@@ -26,15 +26,33 @@ import type { PostmanCollection, PostmanItem } from '../lib/types.js';
 export interface ValidationResult {
   errors: string[];
   warnings: string[];
+  /**
+   * Maps each valid flow name to its step count.
+   * Used by printValidationResult() to display per-flow summaries without
+   * re-running the vm sandbox a second time.
+   */
+  validFlows: Record<string, number>;
 }
 
 // ---------------------------------------------------------------------------
 // Pure validation logic
 // ---------------------------------------------------------------------------
 
+/**
+ * Validate a loaded Postman collection for structural correctness.
+ *
+ * This function is pure — it never prints or exits. Callers decide what to do
+ * with the result. For CLI use, pass the result to {@link printValidationResult}.
+ *
+ * @returns A {@link ValidationResult} with any errors, warnings, and a map of
+ *   valid flow names to their step counts.
+ *
+ * @throws Never — all problems are reported via `errors` / `warnings` in the result.
+ */
 export function validateCollection(collection: PostmanCollection): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const validFlows: Record<string, number> = {};
 
   // ── Info fields ──────────────────────────────────────────────────────────
   const info = collection.info ?? {};
@@ -112,7 +130,7 @@ export function validateCollection(collection: PostmanCollection): ValidationRes
 
       const scriptSrc = preReq.script.exec.join('\n');
 
-      // Reject legacy syntax
+      // Reject legacy syntax before hitting the sandbox
       if (/var\s+FLOW\s*=/.test(scriptSrc) || /\brun\s*\(/.test(scriptSrc)) {
         errors.push(
           `"${flowReq.name}": pre-request script uses legacy syntax — update to "steps([...])"`,
@@ -120,40 +138,32 @@ export function validateCollection(collection: PostmanCollection): ValidationRes
         continue;
       }
 
-      // Extract steps via sandbox
-      let capturedSteps: string[] | null = null;
+      // Extract and validate steps via the shared hardened sandbox
+      let steps: string[];
       try {
-        vm.runInNewContext(scriptSrc, {
-          steps: (stepsArray: string[]) => {
-            capturedSteps = stepsArray;
-          },
-        });
+        steps = runSandboxed(flowReq.name, scriptSrc);
       } catch (e) {
-        errors.push(
-          `"${flowReq.name}": pre-request script failed to evaluate: ${(e as Error).message}`,
-        );
+        errors.push(`"${flowReq.name}": ${(e as Error).message}`);
         continue;
       }
 
-      if (!capturedSteps) {
-        errors.push(`"${flowReq.name}": pre-request script does not call steps()`);
-        continue;
-      }
-      if ((capturedSteps as string[]).length === 0) {
-        errors.push(`"${flowReq.name}": steps() must be called with a non-empty array`);
-        continue;
-      }
-
-      // Resolve each step name
-      for (const step of capturedSteps as string[]) {
+      // Resolve each step name against the request index
+      let allStepsValid = true;
+      for (const step of steps) {
         if (!requestNames.has(step)) {
           errors.push(`"${flowReq.name}": step "${step}" not found in collection`);
+          allStepsValid = false;
         }
+      }
+
+      // Only record as valid if all steps resolve — used by printValidationResult
+      if (allStepsValid) {
+        validFlows[flowReq.name] = steps.length;
       }
     }
   }
 
-  return { errors, warnings };
+  return { errors, warnings, validFlows };
 }
 
 // ---------------------------------------------------------------------------
@@ -162,34 +172,13 @@ export function validateCollection(collection: PostmanCollection): ValidationRes
 
 /**
  * Print the validation result to stdout/stderr.
+ * Uses pre-computed step counts from the ValidationResult — does not re-run
+ * the vm sandbox.
  * Returns true if the collection is valid (no errors), false otherwise.
  */
-export function printValidationResult(
-  result: ValidationResult,
-  collection: PostmanCollection,
-): boolean {
-  const flowsFolder = findFolder(collection.item, 'Flows');
-  if (flowsFolder) {
-    const flowRequests = (flowsFolder.item ?? []).filter((r) => !r.item);
-    for (const flowReq of flowRequests) {
-      const preReq = flowReq.event?.find((e) => e.listen === 'prerequest');
-      if (preReq?.script?.exec?.length) {
-        const scriptSrc = preReq.script.exec.join('\n');
-        let stepCount = 0;
-        try {
-          vm.runInNewContext(scriptSrc, {
-            steps: (arr: string[]) => {
-              stepCount = arr.length;
-            },
-          });
-        } catch {
-          // already captured in errors
-        }
-        if (stepCount > 0) {
-          console.log(`  ✅ Flow "${flowReq.name}" — ${stepCount} steps`);
-        }
-      }
-    }
+export function printValidationResult(result: ValidationResult): boolean {
+  for (const [name, count] of Object.entries(result.validFlows)) {
+    console.log(`  ✅ Flow "${name}" — ${count} steps`);
   }
 
   console.log();
