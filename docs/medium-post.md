@@ -109,7 +109,7 @@ sequence of step names. A collection-level test script acts as a router:
 
 ```javascript
 // Collection-level test script — the "flow router"
-const stepsJson = pm.globals.get("_flow_steps");
+const stepsJson = pm.globals.get('_flow_steps');
 if (!stepsJson) return;
 
 const steps = JSON.parse(stepsJson);
@@ -121,7 +121,7 @@ const nextIdx = idx + 1;
 if (nextIdx < steps.length) {
   pm.execution.setNextRequest(steps[nextIdx]);
 } else {
-  pm.globals.unset("_flow_steps");
+  pm.globals.unset('_flow_steps');
   pm.execution.setNextRequest(null);
 }
 ```
@@ -373,10 +373,10 @@ ordered step names:
 // Admin logs in, creates an organisation, edits it, and views it.
 // Run this flow: ENV=mock node dev/Postman/run-flow.js "Organisation creation"
 steps([
-  "Organisation admin login",
-  "Create Organisation",
-  "Edit Organisation",
-  "View Organisation",
+  'Organisation admin login',
+  'Create Organisation',
+  'Edit Organisation',
+  'View Organisation',
 ]);
 ```
 
