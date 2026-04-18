@@ -129,18 +129,14 @@ describe('validateCollection — flows', () => {
 
   it('errors when steps() receives non-string values', () => {
     const col = makeCollection();
-    (col.item[1].item![0].event![0].script as { exec: string[] }).exec = [
-      'steps([123, "Login"]);',
-    ];
+    (col.item[1].item![0].event![0].script as { exec: string[] }).exec = ['steps([123, "Login"]);'];
     const result = validateCollection(col);
     expect(result.errors.some((e) => e.includes('must contain only strings'))).toBe(true);
   });
 
   it('errors when steps() receives an empty string', () => {
     const col = makeCollection();
-    (col.item[1].item![0].event![0].script as { exec: string[] }).exec = [
-      'steps(["Login", ""]);',
-    ];
+    (col.item[1].item![0].event![0].script as { exec: string[] }).exec = ['steps(["Login", ""]);'];
     const result = validateCollection(col);
     expect(result.errors.some((e) => e.includes('must not contain empty strings'))).toBe(true);
   });
@@ -167,7 +163,9 @@ describe('validateCollection — flows', () => {
         { name: 'Flows', item: [] },
       ],
     });
-    expect(validateCollection(col).warnings.some((w) => w.includes('Duplicate request name "Login"'))).toBe(true);
+    expect(
+      validateCollection(col).warnings.some((w) => w.includes('Duplicate request name "Login"')),
+    ).toBe(true);
   });
 });
 
@@ -231,7 +229,7 @@ describe('validateCollection — absolute file paths', () => {
 describe('printValidationResult', () => {
   it('prints step counts from validFlows without touching the vm', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    printValidationResult({ errors: [], warnings: [], validFlows: { 'My Flow': 4, 'Other': 2 } });
+    printValidationResult({ errors: [], warnings: [], validFlows: { 'My Flow': 4, Other: 2 } });
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('My Flow" — 4 steps');
     expect(output).toContain('Other" — 2 steps');

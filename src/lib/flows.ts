@@ -43,9 +43,7 @@ const VM_TIMEOUT_MS = 1000;
 
 /** Replace quoted string literals with empty placeholders to avoid false-positive pattern matches on step names. */
 function stripStringLiterals(src: string): string {
-  return src
-    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
-    .replace(/'(?:[^'\\]|\\.)*'/g, "''");
+  return src.replace(/"(?:[^"\\]|\\.)*"/g, '""').replace(/'(?:[^'\\]|\\.)*'/g, "''");
 }
 
 /** Throw if the script source references a forbidden identifier outside a string literal. */
@@ -55,7 +53,7 @@ function assertSafeSrc(flowName: string, src: string): void {
     if (pattern.test(stripped)) {
       throw new Error(
         `Pre-request script in "${flowName}" references a forbidden identifier ` +
-        `(matched: ${pattern.source}). Only steps([...]) calls are permitted in flow scripts.`,
+          `(matched: ${pattern.source}). Only steps([...]) calls are permitted in flow scripts.`,
       );
     }
   }

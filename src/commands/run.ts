@@ -12,7 +12,12 @@
  */
 
 import newman, { type NewmanRunOptions } from 'newman';
-import { findRequest, loadCollection, resolveCollectionPath, resolveEnvironmentPath } from '../lib/collection.js';
+import {
+  findRequest,
+  loadCollection,
+  resolveCollectionPath,
+  resolveEnvironmentPath,
+} from '../lib/collection.js';
 import { extractFlowDef, findFlowRequest, listFlows } from '../lib/flows.js';
 import type { FlowDef, PostmanCollection, RunOptions } from '../lib/types.js';
 
@@ -46,9 +51,7 @@ export function buildTempCollection(
     // "check _flow_steps is not set" doesn't cause a false-positive match.
     event: (collection.event ?? []).filter((e) => {
       const src = (e.script?.exec ?? []).join('\n');
-      const stripped = src
-        .replace(/"(?:[^"\\]|\\.)*"/g, '""')
-        .replace(/'(?:[^'\\]|\\.)*'/g, "''");
+      const stripped = src.replace(/"(?:[^"\\]|\\.)*"/g, '""').replace(/'(?:[^'\\]|\\.)*'/g, "''");
       return !/\b_flow_steps\b/.test(stripped);
     }),
     item: flowItems,

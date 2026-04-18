@@ -15,7 +15,13 @@
 export { getFlowSummaries, printFlowList } from './commands/list.js';
 export { runFlow, runAllFlows } from './commands/run.js';
 export { validateCollection, printValidationResult } from './commands/validate.js';
-export { loadCollection, resolveCollectionPath, resolveEnvironmentPath, findFolder, findRequest } from './lib/collection.js';
+export {
+  loadCollection,
+  resolveCollectionPath,
+  resolveEnvironmentPath,
+  findFolder,
+  findRequest,
+} from './lib/collection.js';
 export { listFlows, extractFlowDef, findFlowRequest } from './lib/flows.js';
 export type {
   FlowDef,

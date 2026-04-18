@@ -25,9 +25,9 @@ function makeCollection(overrides: Partial<PostmanCollection> = {}): PostmanColl
       {
         name: 'Requests',
         item: [
-          { name: 'Login',       request: { method: 'POST', url: { raw: 'http://x/login' } } },
-          { name: 'Create Org',  request: { method: 'POST', url: { raw: 'http://x/orgs' } } },
-          { name: 'View Org',    request: { method: 'GET',  url: { raw: 'http://x/orgs/1' } } },
+          { name: 'Login', request: { method: 'POST', url: { raw: 'http://x/login' } } },
+          { name: 'Create Org', request: { method: 'POST', url: { raw: 'http://x/orgs' } } },
+          { name: 'View Org', request: { method: 'GET', url: { raw: 'http://x/orgs/1' } } },
           { name: 'Upload File', request: { method: 'POST', url: { raw: 'http://x/upload' } } },
         ],
       },
@@ -37,26 +37,35 @@ function makeCollection(overrides: Partial<PostmanCollection> = {}): PostmanColl
           {
             name: 'Onboarding',
             request: { method: 'FLOW', url: { raw: 'about:blank' } },
-            event: [{
-              listen: 'prerequest',
-              script: { type: 'text/javascript', exec: ["steps(['Login', 'Create Org', 'View Org']);"] },
-            }],
+            event: [
+              {
+                listen: 'prerequest',
+                script: {
+                  type: 'text/javascript',
+                  exec: ["steps(['Login', 'Create Org', 'View Org']);"],
+                },
+              },
+            ],
           },
           {
             name: 'Upload',
             request: { method: 'FLOW', url: { raw: 'about:blank' } },
-            event: [{
-              listen: 'prerequest',
-              script: { type: 'text/javascript', exec: ["steps(['Login', 'Upload File']);"] },
-            }],
+            event: [
+              {
+                listen: 'prerequest',
+                script: { type: 'text/javascript', exec: ["steps(['Login', 'Upload File']);"] },
+              },
+            ],
           },
           {
             name: 'Single step flow',
             request: { method: 'FLOW', url: { raw: 'about:blank' } },
-            event: [{
-              listen: 'prerequest',
-              script: { type: 'text/javascript', exec: ["steps(['Login']);"] },
-            }],
+            event: [
+              {
+                listen: 'prerequest',
+                script: { type: 'text/javascript', exec: ["steps(['Login']);"] },
+              },
+            ],
           },
         ],
       },
@@ -164,7 +173,11 @@ describe('printFlowList', () => {
     printFlowList(makeCollection());
     // "Single step flow" is the longest name (16 chars); "Onboarding" (10) and
     // "Upload" (6) should be padded to the same width so columns align.
-    const lines = logSpy.mock.calls.flat().join('\n').split('\n').filter((l) => l.includes('•'));
+    const lines = logSpy.mock.calls
+      .flat()
+      .join('\n')
+      .split('\n')
+      .filter((l) => l.includes('•'));
     const colPositions = lines.map((l) => l.indexOf('('));
     expect(new Set(colPositions).size).toBe(1); // all '(' at the same column
     vi.restoreAllMocks();

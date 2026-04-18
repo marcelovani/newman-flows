@@ -1,0 +1,62 @@
+#!/bin/sh
+
+# Source bash profile to ensure nvm is loaded
+if [ "$(which npm)" == "" ]; then
+  if [ -f ~/.bash_profile ]; then
+    source ~/.bash_profile
+  elif [ -f ~/.bashrc ]; then
+    source ~/.bashrc
+  elif [ -f ~/.zshrc ]; then
+    source ~/.zshrc
+  fi
+fi
+
+# Check if docker is installed
+if [ "$(which docker)" == "" ]; then
+ # Append /usr/local/bin to PATH
+ export PATH=$PATH:/usr/local/bin
+fi
+
+run_check() {
+  LABEL=$1
+  CMD=$2
+  shift
+  printf "  %-30s" "$LABEL..."
+  OUTPUT=$($CMD 2>&1)
+  RESULT=$?
+  if [ $RESULT -ne 0 ]; then
+    echo "❌"
+    echo "$OUTPUT"
+    echo "Push aborted."
+    exit 1
+  fi
+  echo "✅"
+}
+
+run_check_warn() {
+  LABEL=$1
+  CMD=$2
+  FIX_CMD=$3
+  shift 3
+  printf "  %-30s" "$LABEL..."
+  OUTPUT=$($CMD 2>&1)
+  RESULT=$?
+  if [ $RESULT -ne 0 ]; then
+    echo "⚠️"
+    echo "$OUTPUT"
+    printf "  Run \`%s\` to fix automatically. Abort push? [Y/n] " "$FIX_CMD"
+    read -r REPLY </dev/tty
+    case "$REPLY" in
+      [nN]) echo "  Skipping $LABEL fix, continuing..." ;;
+      *) echo "Push aborted. Run \`$FIX_CMD\` then push again."; exit 1 ;;
+    esac
+  else
+    echo "✅"
+  fi
+}
+
+echo "Running pre-push checks..."
+run_check_warn "Prettier"   "npm run format -- --check" "npm run format"
+run_check_warn "ESLint"     "npm run lint"              "npm run lint:fix"
+run_check      "Typecheck"  "npm run typecheck"
+run_check      "Unit tests" "npm run test:unit"

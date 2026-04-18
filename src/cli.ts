@@ -75,11 +75,14 @@ program
       },
     ) => {
       try {
-        const reporters = opts.reporters ? opts.reporters.split(',').map((r) => r.trim()) : undefined;
+        const reporters = opts.reporters
+          ? opts.reporters.split(',').map((r) => r.trim())
+          : undefined;
 
         const reporter: Record<string, unknown> = {};
         if (opts.reporterJunitExport) reporter['junit'] = { export: opts.reporterJunitExport };
-        if (opts.reporterHtmlextraExport) reporter['htmlextra'] = { export: opts.reporterHtmlextraExport };
+        if (opts.reporterHtmlextraExport)
+          reporter['htmlextra'] = { export: opts.reporterHtmlextraExport };
         if (opts.reporterJsonExport) reporter['json'] = { export: opts.reporterJsonExport };
 
         if (opts.all) {

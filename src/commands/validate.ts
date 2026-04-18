@@ -188,7 +188,9 @@ export function printValidationResult(result: ValidationResult): boolean {
   }
   if (result.errors.length > 0) {
     result.errors.forEach((e) => console.error(`❌ ${e}`));
-    console.error(`\n${result.errors.length} error(s) found. Fix before importing or running flows.`);
+    console.error(
+      `\n${result.errors.length} error(s) found. Fix before importing or running flows.`,
+    );
     return false;
   }
   console.log('✅ Collection valid.');
