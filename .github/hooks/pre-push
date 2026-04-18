@@ -55,6 +55,22 @@ run_check_warn() {
   fi
 }
 
+# Validate tag names — must start with "v" (e.g. v1.2.3)
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/tags/*)
+      tag_name="${remote_ref#refs/tags/}"
+      case "$tag_name" in
+        v*) ;;
+        *)
+          echo "ERROR: Tag \"$tag_name\" does not start with \"v\". Use \"v$tag_name\" instead."
+          exit 1
+          ;;
+      esac
+      ;;
+  esac
+done
+
 echo "Running pre-push checks..."
 run_check_warn "Prettier"   "npm run format -- --check" "npm run format"
 run_check_warn "ESLint"     "npm run lint"              "npm run lint:fix"

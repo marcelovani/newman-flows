@@ -1,0 +1,19 @@
+name: Tag Lint
+
+on:
+  create:
+
+jobs:
+  check-tag-name:
+    if: github.ref_type == 'tag'
+    name: Validate tag name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check v-prefix
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [[ "$TAG" != v* ]]; then
+            echo "::error::Tag \"$TAG\" does not start with \"v\". Delete this tag and recreate it as \"v$TAG\"."
+            exit 1
+          fi
+          echo "Tag \"$TAG\" is valid."
