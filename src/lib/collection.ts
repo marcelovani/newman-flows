@@ -81,7 +81,10 @@ export function resolveCollectionPath(override?: string): string {
 
   const dir = path.join(process.cwd(), POSTMAN_DIR);
   if (fs.existsSync(dir)) {
-    const match = fs.readdirSync(dir).sort().find((f) => f.endsWith('.postman_collection.json'));
+    const match = fs
+      .readdirSync(dir)
+      .sort()
+      .find((f) => f.endsWith('.postman_collection.json'));
     if (match) return path.join(dir, match);
   }
 
@@ -95,13 +98,11 @@ export function resolveCollectionPath(override?: string): string {
  *
  * Resolution order:
  *   1. Explicit override (--env flag or programmatic option)
- *   2. DEV_TOOL env var: any value containing "docker" (e.g. "docker",
- *      "docker-compose") → first environment file whose name contains "docker"
- *      (case-insensitive); otherwise first file whose name contains "ddev".
- *      This matches common naming conventions like "Drupal Ddev …" or just
- *      "Ddev …".
- *   3. First *.postman_environment.json in <cwd>/dev/Postman/ (alphabetical)
- *   4. undefined (Newman runs without an environment file)
+ *   2. First *.postman_environment.json in <cwd>/dev/Postman/ (alphabetical)
+ *   3. undefined (Newman runs without an environment file)
+ *
+ * When multiple environment files exist (e.g. one per environment), pass
+ * --env <path> to select the one you want.
  */
 export function resolveEnvironmentPath(override?: string): string | undefined {
   if (override) return path.isAbsolute(override) ? override : path.resolve(process.cwd(), override);
@@ -109,11 +110,11 @@ export function resolveEnvironmentPath(override?: string): string | undefined {
   const dir = path.join(process.cwd(), POSTMAN_DIR);
   if (!fs.existsSync(dir)) return undefined;
 
-  const files = fs.readdirSync(dir).sort().filter((f) => f.endsWith('.postman_environment.json'));
+  const files = fs
+    .readdirSync(dir)
+    .sort()
+    .filter((f) => f.endsWith('.postman_environment.json'));
   if (files.length === 0) return undefined;
 
-  const devTool = (process.env['DEV_TOOL'] ?? 'ddev').toLowerCase();
-  const keyword = devTool.includes('docker') ? 'docker' : 'ddev';
-  const preferred = files.find((f) => f.toLowerCase().includes(keyword));
-  return path.join(dir, preferred ?? files[0]);
+  return path.join(dir, files[0]);
 }

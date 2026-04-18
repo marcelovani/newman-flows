@@ -154,12 +154,7 @@ Each entry in `Flows/` is a Postman request with:
 ```javascript
 // Org admin logs in, creates an organisation, edits it, and views it.
 // Run: newman-flows run "Org admin creates org"
-steps([
-  "Org admin login",
-  "Create Organization",
-  "Edit Organization",
-  "View Organization",
-]);
+steps(['Org admin login', 'Create Organization', 'Edit Organization', 'View Organization']);
 ```
 
 Step names must **exactly match** request names in `Requests/`.
@@ -188,13 +183,43 @@ Export the collection from Postman desktop (`File → Export → Collection v2.1
 
 ---
 
-## Collection path
+## File discovery
 
-By default `newman-flows` looks for a `*.postman_collection.json` file in `<cwd>/dev/Postman/`. Override with a flag:
+`newman-flows` resolves the collection and environment from `process.cwd()` — the directory you run the command from. When used via `npm run`, that is always the project root.
+
+### Collection
+
+Resolution order:
+
+1. `--collection <path>` flag (absolute or relative to cwd)
+2. First `*.postman_collection.json` found in `<cwd>/dev/Postman/` (alphabetical — deterministic when multiple files exist)
+3. Error with a helpful message
 
 ```bash
+# Auto-discovered from dev/Postman/
+npx newman-flows run --all
+
+# Explicit override
 npx newman-flows run --all --collection ./path/to/my.postman_collection.json
 ```
+
+### Environment
+
+Resolution order:
+
+1. `--env <path>` flag (absolute or relative to cwd)
+2. First `*.postman_environment.json` in `<cwd>/dev/Postman/` (alphabetical)
+3. No environment file — Newman runs without one
+
+```bash
+# Auto-discovered (alphabetically first env file in dev/Postman/)
+npx newman-flows run --all
+
+# Explicit path — use this when you have multiple env files
+npx newman-flows run --all --env ./dev/Postman/staging.postman_environment.json
+```
+
+When your project has multiple environment files (local, staging, CI, etc.), pass `--env` explicitly rather than relying on auto-discovery.
 
 ---
 
