@@ -59,7 +59,7 @@ describe('POST /api/auth/login', () => {
   it('returns an access_token', async () => {
     const res = await post('/api/auth/login', {
       username: 'admin@example.com',
-      password: 'secret',
+      password: 'password',
     });
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -74,8 +74,8 @@ describe('POST /api/auth/login', () => {
 
   it('returns distinct tokens for different users', async () => {
     const [a, b] = await Promise.all([
-      post('/api/auth/login', { username: 'admin@example.com', password: 'secret' }),
-      post('/api/auth/login', { username: 'member@example.com', password: 'secret' }),
+      post('/api/auth/login', { username: 'admin@example.com', password: 'password' }),
+      post('/api/auth/login', { username: 'member@example.com', password: 'password' }),
     ]);
     const [jsonA, jsonB] = await Promise.all([a.json(), b.json()]);
     expect(jsonA.access_token).not.toBe(jsonB.access_token);
@@ -90,7 +90,7 @@ describe('Item creation flow', () => {
   it('logs in → creates → edits → views', async () => {
     const loginRes = await post('/api/auth/login', {
       username: 'admin@example.com',
-      password: 'secret',
+      password: 'password',
     });
     const { access_token } = await loginRes.json();
 
@@ -124,7 +124,7 @@ describe('Item creation flow', () => {
   it('returns 404 for unknown item', async () => {
     const loginRes = await post('/api/auth/login', {
       username: 'admin@example.com',
-      password: 'secret',
+      password: 'password',
     });
     const { access_token } = await loginRes.json();
     const res = await get('/api/items/does-not-exist', access_token);
@@ -139,8 +139,8 @@ describe('Item creation flow', () => {
 describe('Member invitation flow', () => {
   it('admin invites member → member accepts → member appears in members list', async () => {
     const [adminLogin, memberLogin] = await Promise.all([
-      post('/api/auth/login', { username: 'admin@example.com', password: 'secret' }),
-      post('/api/auth/login', { username: 'member@example.com', password: 'secret' }),
+      post('/api/auth/login', { username: 'admin@example.com', password: 'password' }),
+      post('/api/auth/login', { username: 'member@example.com', password: 'password' }),
     ]);
     const { access_token: adminToken } = await adminLogin.json();
     const { access_token: memberToken } = await memberLogin.json();
@@ -171,7 +171,7 @@ describe('Member invitation flow', () => {
   it('returns 409 if invitation already accepted', async () => {
     const loginRes = await post('/api/auth/login', {
       username: 'admin@example.com',
-      password: 'secret',
+      password: 'password',
     });
     const { access_token } = await loginRes.json();
 

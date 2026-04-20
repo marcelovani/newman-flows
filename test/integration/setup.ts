@@ -10,7 +10,7 @@
 
 import * as http from 'http';
 import { afterAll, beforeAll } from 'vitest';
-import { createApp } from '../mock/mock-server';
+import { createServer } from '../../examples/my-api/mock-server.js';
 
 export let MOCK_PORT = Number(process.env.MOCK_PORT) || 0;
 export let MOCK_BASE_URL = '';
@@ -18,9 +18,9 @@ export let MOCK_BASE_URL = '';
 let server: http.Server;
 
 beforeAll(async () => {
-  const app = createApp();
+  server = createServer();
   await new Promise<void>((resolve, reject) => {
-    server = app.listen(MOCK_PORT, () => {
+    server.listen(MOCK_PORT, () => {
       const addr = server.address();
       MOCK_PORT = typeof addr === 'object' && addr !== null ? addr.port : MOCK_PORT;
       MOCK_BASE_URL = `http://localhost:${MOCK_PORT}`;

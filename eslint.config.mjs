@@ -30,6 +30,14 @@ export default [
     },
   },
   {
+    files: ['examples/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+  {
     ignores: ['dist/**', 'node_modules/**', 'test/fixtures/**'],
   },
 ];
