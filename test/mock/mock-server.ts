@@ -5,35 +5,40 @@
  * mock-server.ts
  *
  * A lightweight Express server that mocks every API endpoint used by the
- * Postman collection. State (organisations, invitations) is held in memory
- * so that variables set by one request (e.g. organisation_id) are available
- * to subsequent requests in the same flow.
+ * examples/my-api/ Postman collection. State is held in memory so that
+ * variables set by one request (e.g. item_id) are available to subsequent
+ * requests in the same flow.
  *
  * Exported as createApp() so Vitest integration tests can start/stop it
- * programmatically. When run directly, it starts on PORT (default 3000).
+ * programmatically. When run directly, it starts on PORT (default 8080).
  *
  * Usage (standalone):
- *   npm run mock          # starts on port 3000
+ *   npm run mock          # starts on port 8080
  *   PORT=4000 npm run mock
  */
 
 import express, { Request, Response } from 'express';
 
 // ---------------------------------------------------------------------------
-// In-memory state
+// In-memory state types
 // ---------------------------------------------------------------------------
 
-interface Org {
+interface Item {
   id: string;
   name: string;
-  members: { id: string; email: string }[];
+  status: string;
 }
 
 interface Invitation {
   id: string;
-  orgId: string;
-  email: string;
+  itemId: string;
+  invitee_email: string;
   status: 'pending' | 'accepted';
+}
+
+interface Member {
+  id: string;
+  email: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -58,8 +63,9 @@ function requireAuth(req: Request, res: Response): boolean {
 // ---------------------------------------------------------------------------
 
 export function createApp() {
-  const orgs: Record<string, Org> = {};
+  const items: Record<string, Item> = {};
   const invitations: Record<string, Invitation> = {};
+  const members: Record<string, Member[]> = {}; // keyed by item_id
 
   const app = express();
   app.use(express.json());
@@ -78,67 +84,81 @@ export function createApp() {
       return res.status(400).json({ error: 'username and password are required' });
     }
     const token = `mock-token-${username.replace(/[^a-z0-9]/gi, '-')}-${uid()}`;
-    res.status(200).json({ access_token: token, user: { id: `user-${uid()}`, email: username } });
+    const userId = `user-${username.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    res.status(200).json({ access_token: token, user: { id: userId, email: username } });
   });
 
   // ---------------------------------------------------------------------------
-  // Organisations
+  // Items
   // ---------------------------------------------------------------------------
 
-  app.post('/api/organisations', (req: Request, res: Response) => {
+  app.post('/api/items', (req: Request, res: Response) => {
     if (!requireAuth(req, res)) return;
-    const { name } = req.body || {};
+    const { name, status } = req.body || {};
     if (!name) return res.status(400).json({ error: 'name is required' });
-    const id = `org-${uid()}`;
-    orgs[id] = { id, name, members: [{ id: `user-${uid()}`, email: 'admin@example.com' }] };
-    res.status(201).json(orgs[id]);
+    const id = uid();
+    items[id] = { id, name, status: status || 'active' };
+    res.status(201).json(items[id]);
   });
 
-  app.patch('/api/organisations/:id', (req: Request, res: Response) => {
+  app.get('/api/items', (req: Request, res: Response) => {
     if (!requireAuth(req, res)) return;
-    const orgId = String(req.params.id);
-    const org = orgs[orgId];
-    if (!org) return res.status(404).json({ error: 'Organisation not found' });
-    if (req.body.name) org.name = req.body.name;
-    res.status(200).json(org);
+    res.status(200).json(Object.values(items));
   });
 
-  app.get('/api/organisations/:id', (req: Request, res: Response) => {
+  app.patch('/api/items/:id', (req: Request, res: Response) => {
     if (!requireAuth(req, res)) return;
-    const orgId = String(req.params.id);
-    const org = orgs[orgId];
-    if (!org) return res.status(404).json({ error: 'Organisation not found' });
-    res.status(200).json(org);
+    const item = items[req.params.id];
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    if (req.body.name) item.name = req.body.name;
+    if (req.body.status) item.status = req.body.status;
+    res.status(200).json(item);
+  });
+
+  app.get('/api/items/:id', (req: Request, res: Response) => {
+    if (!requireAuth(req, res)) return;
+    const item = items[req.params.id];
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    res.status(200).json(item);
   });
 
   // ---------------------------------------------------------------------------
   // Invitations
   // ---------------------------------------------------------------------------
 
-  app.post('/api/organisations/:id/invitations', (req: Request, res: Response) => {
+  app.post('/api/items/:id/invitations', (req: Request, res: Response) => {
     if (!requireAuth(req, res)) return;
-    const orgId = String(req.params.id);
-    const org = orgs[orgId];
-    if (!org) return res.status(404).json({ error: 'Organisation not found' });
+    const itemId = req.params.id;
+    if (!items[itemId]) return res.status(404).json({ error: 'Item not found' });
     const { email } = req.body || {};
     if (!email) return res.status(400).json({ error: 'email is required' });
-    const id = `inv-${uid()}`;
-    invitations[id] = { id, orgId, email, status: 'pending' };
+    const id = uid();
+    invitations[id] = { id, itemId, invitee_email: email, status: 'pending' };
     res.status(201).json(invitations[id]);
   });
 
   app.post('/api/invitations/:id/accept', (req: Request, res: Response) => {
     if (!requireAuth(req, res)) return;
-    const invId = String(req.params.id);
-    const inv = invitations[invId];
+    const inv = invitations[req.params.id];
     if (!inv) return res.status(404).json({ error: 'Invitation not found' });
     if (inv.status === 'accepted') {
       return res.status(409).json({ error: 'Invitation already accepted' });
     }
     inv.status = 'accepted';
-    const org = orgs[inv.orgId];
-    if (org) org.members.push({ id: `user-${uid()}`, email: inv.email });
-    res.status(200).json({ status: 'accepted', invitationId: inv.id });
+    if (!members[inv.itemId]) members[inv.itemId] = [];
+    const memberId = `user-${inv.invitee_email.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    members[inv.itemId].push({ id: memberId, email: inv.invitee_email });
+    res.status(200).json({ status: 'accepted' });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Members
+  // ---------------------------------------------------------------------------
+
+  app.get('/api/items/:id/members', (req: Request, res: Response) => {
+    if (!requireAuth(req, res)) return;
+    if (!items[req.params.id]) return res.status(404).json({ error: 'Item not found' });
+    res.status(200).json(members[req.params.id] || []);
   });
 
   return app;
@@ -149,17 +169,19 @@ export function createApp() {
 // ---------------------------------------------------------------------------
 
 if (require.main === module) {
-  const PORT = Number(process.env.PORT) || 3000;
+  const PORT = Number(process.env.PORT) || 8080;
   const app = createApp();
   app.listen(PORT, () => {
     console.log(`[mock] Server listening at http://localhost:${PORT}`);
     console.log(`[mock] Endpoints:`);
     console.log(`[mock]   GET    /health`);
     console.log(`[mock]   POST   /api/auth/login`);
-    console.log(`[mock]   POST   /api/organisations`);
-    console.log(`[mock]   PATCH  /api/organisations/:id`);
-    console.log(`[mock]   GET    /api/organisations/:id`);
-    console.log(`[mock]   POST   /api/organisations/:id/invitations`);
+    console.log(`[mock]   POST   /api/items`);
+    console.log(`[mock]   GET    /api/items`);
+    console.log(`[mock]   PATCH  /api/items/:id`);
+    console.log(`[mock]   GET    /api/items/:id`);
+    console.log(`[mock]   POST   /api/items/:id/invitations`);
     console.log(`[mock]   POST   /api/invitations/:id/accept`);
+    console.log(`[mock]   GET    /api/items/:id/members`);
   });
 }
