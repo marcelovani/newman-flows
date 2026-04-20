@@ -83,10 +83,10 @@ describe('POST /api/auth/login', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Organisation creation flow
+// Item creation flow
 // ---------------------------------------------------------------------------
 
-describe('Organisation creation flow', () => {
+describe('Item creation flow', () => {
   it('logs in → creates → edits → views', async () => {
     const loginRes = await post('/api/auth/login', {
       username: 'admin@example.com',
@@ -94,41 +94,40 @@ describe('Organisation creation flow', () => {
     });
     const { access_token } = await loginRes.json();
 
-    const createRes = await post('/api/organisations', { name: 'Acme Corp' }, access_token);
+    const createRes = await post('/api/items', { name: 'Test Item' }, access_token);
     expect(createRes.status).toBe(201);
-    const org = await createRes.json();
-    expect(org).toHaveProperty('id');
-    expect(org.name).toBe('Acme Corp');
+    const item = await createRes.json();
+    expect(item).toHaveProperty('id');
+    expect(item.name).toBe('Test Item');
 
     const editRes = await patch(
-      `/api/organisations/${org.id}`,
-      { name: 'Acme Corp (updated)' },
+      `/api/items/${item.id}`,
+      { name: 'Test Item (updated)' },
       access_token,
     );
     expect(editRes.status).toBe(200);
     const edited = await editRes.json();
-    expect(edited.name).toBe('Acme Corp (updated)');
+    expect(edited.name).toBe('Test Item (updated)');
 
-    const viewRes = await get(`/api/organisations/${org.id}`, access_token);
+    const viewRes = await get(`/api/items/${item.id}`, access_token);
     expect(viewRes.status).toBe(200);
     const viewed = await viewRes.json();
-    expect(viewed.name).toBe('Acme Corp (updated)');
-    expect(viewed.members).toBeInstanceOf(Array);
-    expect(viewed.members.length).toBeGreaterThan(0);
+    expect(viewed.id).toBe(item.id);
+    expect(viewed.name).toBe('Test Item (updated)');
   });
 
   it('returns 401 without auth token', async () => {
-    const res = await post('/api/organisations', { name: 'Acme Corp' });
+    const res = await post('/api/items', { name: 'Test Item' });
     expect(res.status).toBe(401);
   });
 
-  it('returns 404 for unknown org', async () => {
+  it('returns 404 for unknown item', async () => {
     const loginRes = await post('/api/auth/login', {
       username: 'admin@example.com',
       password: 'secret',
     });
     const { access_token } = await loginRes.json();
-    const res = await get('/api/organisations/does-not-exist', access_token);
+    const res = await get('/api/items/does-not-exist', access_token);
     expect(res.status).toBe(404);
   });
 });
@@ -138,7 +137,7 @@ describe('Organisation creation flow', () => {
 // ---------------------------------------------------------------------------
 
 describe('Member invitation flow', () => {
-  it('admin invites member → member accepts', async () => {
+  it('admin invites member → member accepts → member appears in members list', async () => {
     const [adminLogin, memberLogin] = await Promise.all([
       post('/api/auth/login', { username: 'admin@example.com', password: 'secret' }),
       post('/api/auth/login', { username: 'member@example.com', password: 'secret' }),
@@ -146,12 +145,10 @@ describe('Member invitation flow', () => {
     const { access_token: adminToken } = await adminLogin.json();
     const { access_token: memberToken } = await memberLogin.json();
 
-    const org = await (
-      await post('/api/organisations', { name: 'Invite Test Org' }, adminToken)
-    ).json();
+    const item = await (await post('/api/items', { name: 'Invite Test Item' }, adminToken)).json();
 
     const invRes = await post(
-      `/api/organisations/${org.id}/invitations`,
+      `/api/items/${item.id}/invitations`,
       { email: 'member@example.com' },
       adminToken,
     );
@@ -165,11 +162,10 @@ describe('Member invitation flow', () => {
     const accepted = await acceptRes.json();
     expect(accepted.status).toBe('accepted');
 
-    const viewRes = await get(`/api/organisations/${org.id}`, adminToken);
-    const final = await viewRes.json();
-    expect(final.members.some((m: { email: string }) => m.email === 'member@example.com')).toBe(
-      true,
-    );
+    const membersRes = await get(`/api/items/${item.id}/members`, adminToken);
+    expect(membersRes.status).toBe(200);
+    const membersList = await membersRes.json();
+    expect(membersList.some((m: { email: string }) => m.email === 'member@example.com')).toBe(true);
   });
 
   it('returns 409 if invitation already accepted', async () => {
@@ -179,15 +175,11 @@ describe('Member invitation flow', () => {
     });
     const { access_token } = await loginRes.json();
 
-    const org = await (
-      await post('/api/organisations', { name: 'Double Accept Org' }, access_token)
+    const item = await (
+      await post('/api/items', { name: 'Double Accept Item' }, access_token)
     ).json();
     const inv = await (
-      await post(
-        `/api/organisations/${org.id}/invitations`,
-        { email: 'x@example.com' },
-        access_token,
-      )
+      await post(`/api/items/${item.id}/invitations`, { email: 'x@example.com' }, access_token)
     ).json();
 
     await post(`/api/invitations/${inv.id}/accept`, {}, access_token);
