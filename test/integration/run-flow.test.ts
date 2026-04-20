@@ -17,12 +17,9 @@ import { MOCK_PORT } from './setup.js';
 
 const COLLECTION_PATH = path.resolve(
   __dirname,
-  '../fixtures/collection/my-api.postman_collection.json',
+  '../../examples/my-api/my-api.postman_collection.json',
 );
-const ENV_PATH = path.resolve(
-  __dirname,
-  '../fixtures/environments/environment.mock.postman_environment.json',
-);
+const ENV_PATH = path.resolve(__dirname, '../../examples/my-api/local.postman_environment.json');
 
 // Write a per-test-run env override so the mock port is always consistent
 // with what setup.ts actually bound (in case MOCK_PORT env var is used).
@@ -54,12 +51,12 @@ afterAll(() => {
 // ---------------------------------------------------------------------------
 
 describe('runFlow', () => {
-  it('runs "Organisation creation" flow end-to-end', async () => {
+  it('runs "Create and edit item" flow end-to-end', async () => {
     const { runFlow } = await import('../../src/commands/run.js');
     await expect(
       runFlow({
         collection: COLLECTION_PATH,
-        flow: 'Organisation creation',
+        flow: 'Create and edit item',
         env: envPath,
       }),
     ).resolves.toBeUndefined();
@@ -115,6 +112,6 @@ describe('validateCollection (integration)', () => {
     const collection = loadCollection(COLLECTION_PATH);
     const result = validateCollection(collection);
     expect(result.errors).toHaveLength(0);
-    expect(Object.keys(result.validFlows)).toHaveLength(2); // Organisation creation + Member invitation
+    expect(Object.keys(result.validFlows)).toHaveLength(2); // Create and edit item + Member invitation
   });
 });

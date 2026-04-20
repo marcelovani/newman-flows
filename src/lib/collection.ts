@@ -66,37 +66,80 @@ export function loadCollection(filePath: string): PostmanCollection {
 // Path auto-discovery
 // ---------------------------------------------------------------------------
 
-const POSTMAN_DIR = path.join('dev', 'Postman');
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  '.cache',
+  'coverage',
+  '.nyc_output',
+  '.turbo',
+  'vendor',
+]);
+
+/**
+ * Recursively find all files ending with `suffix` under `rootDir`,
+ * skipping common non-source directories.
+ *
+ * Results are sorted shallower-first, then alphabetically, so a file at
+ * `postman/col.json` is preferred over `src/tests/postman/col.json`.
+ */
+function findFilesRecursively(rootDir: string, suffix: string): string[] {
+  const results: string[] = [];
+
+  function walk(dir: string): void {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (!SKIP_DIRS.has(entry.name) && !entry.name.startsWith('.')) {
+          walk(path.join(dir, entry.name));
+        }
+      } else if (entry.isFile() && entry.name.endsWith(suffix)) {
+        results.push(path.join(dir, entry.name));
+      }
+    }
+  }
+
+  walk(rootDir);
+  results.sort((a, b) => {
+    const depthDiff = a.split(path.sep).length - b.split(path.sep).length;
+    return depthDiff !== 0 ? depthDiff : a.localeCompare(b);
+  });
+  return results;
+}
 
 /**
  * Resolve the collection file path.
  *
  * Resolution order:
  *   1. Explicit override (--collection flag or programmatic option)
- *   2. First *.postman_collection.json in <cwd>/dev/Postman/
+ *   2. First *.postman_collection.json found recursively under cwd
+ *      (shallower paths preferred; alphabetical on ties)
  *   3. Throws with a helpful message
  */
 export function resolveCollectionPath(override?: string): string {
   if (override) return path.isAbsolute(override) ? override : path.resolve(process.cwd(), override);
 
-  const dir = path.join(process.cwd(), POSTMAN_DIR);
-  if (fs.existsSync(dir)) {
-    const matches = fs
-      .readdirSync(dir)
-      .sort()
-      .filter((f) => f.endsWith('.postman_collection.json'));
-    if (matches.length > 1) {
-      console.warn(
-        `Warning: multiple collection files found in ${POSTMAN_DIR}/:\n` +
-          matches.map((f) => `  ${f}`).join('\n') +
-          `\nUsing "${matches[0]}". Pass --collection <path> to select a different one.`,
-      );
-    }
-    if (matches.length > 0) return path.join(dir, matches[0]);
+  const matches = findFilesRecursively(process.cwd(), '.postman_collection.json');
+
+  if (matches.length > 1) {
+    const rel = matches.map((f) => path.relative(process.cwd(), f));
+    console.warn(
+      `Warning: multiple collection files found:\n` +
+        rel.map((f) => `  ${f}`).join('\n') +
+        `\nUsing "${rel[0]}". Pass --collection <path> to select a different one.`,
+    );
   }
+  if (matches.length > 0) return matches[0];
 
   throw new Error(
-    `No collection file found. Pass --collection <path> or place a *.postman_collection.json in ${POSTMAN_DIR}/`,
+    `No collection file found. Pass --collection <path> or add a *.postman_collection.json anywhere in your project.`,
   );
 }
 
@@ -105,7 +148,8 @@ export function resolveCollectionPath(override?: string): string {
  *
  * Resolution order:
  *   1. Explicit override (--env flag or programmatic option)
- *   2. First *.postman_environment.json in <cwd>/dev/Postman/ (alphabetical)
+ *   2. First *.postman_environment.json found recursively under cwd
+ *      (shallower paths preferred; alphabetical on ties)
  *   3. undefined (Newman runs without an environment file)
  *
  * When multiple environment files exist (e.g. one per environment), pass
@@ -114,22 +158,16 @@ export function resolveCollectionPath(override?: string): string {
 export function resolveEnvironmentPath(override?: string): string | undefined {
   if (override) return path.isAbsolute(override) ? override : path.resolve(process.cwd(), override);
 
-  const dir = path.join(process.cwd(), POSTMAN_DIR);
-  if (!fs.existsSync(dir)) return undefined;
-
-  const files = fs
-    .readdirSync(dir)
-    .sort()
-    .filter((f) => f.endsWith('.postman_environment.json'));
+  const files = findFilesRecursively(process.cwd(), '.postman_environment.json');
   if (files.length === 0) return undefined;
 
   if (files.length > 1) {
+    const rel = files.map((f) => path.relative(process.cwd(), f));
     console.warn(
-      `Warning: multiple environment files found in ${POSTMAN_DIR}/:\n` +
-        files.map((f) => `  ${f}`).join('\n') +
-        `\nUsing "${files[0]}". Pass --env <path> to select a different one.`,
+      `Warning: multiple environment files found:\n` +
+        rel.map((f) => `  ${f}`).join('\n') +
+        `\nUsing "${rel[0]}". Pass --env <path> to select a different one.`,
     );
   }
-
-  return path.join(dir, files[0]);
+  return files[0];
 }

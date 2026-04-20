@@ -171,15 +171,35 @@ describe('resolveCollectionPath', () => {
     expect(result).toBe(path.join(tmpDir, 'relative/col.json'));
   });
 
-  it('auto-discovers a *.postman_collection.json in dev/Postman/', () => {
+  it('auto-discovers a collection in an arbitrary subdirectory', () => {
+    const dir = path.join(tmpDir, 'postman');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'My API.postman_collection.json'), '{}');
+    expect(resolveCollectionPath()).toContain('My API.postman_collection.json');
+  });
+
+  it('auto-discovers a collection nested under dev/Postman/', () => {
     const dir = path.join(tmpDir, 'dev', 'Postman');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'My API.postman_collection.json'), '{}');
     expect(resolveCollectionPath()).toContain('My API.postman_collection.json');
   });
 
-  it('returns the alphabetically first collection when multiple exist and warns', () => {
-    const dir = path.join(tmpDir, 'dev', 'Postman');
+  it('prefers a shallower file over a deeper one', () => {
+    fs.mkdirSync(path.join(tmpDir, 'shallow'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, 'deep', 'nested', 'dir'), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, 'deep', 'nested', 'dir', 'api.postman_collection.json'),
+      '{}',
+    );
+    fs.writeFileSync(path.join(tmpDir, 'shallow', 'api.postman_collection.json'), '{}');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(resolveCollectionPath()).toContain(path.join('shallow', 'api.postman_collection.json'));
+    warn.mockRestore();
+  });
+
+  it('returns the alphabetically first collection at the same depth and warns', () => {
+    const dir = path.join(tmpDir, 'postman');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'beta.postman_collection.json'), '{}');
     fs.writeFileSync(path.join(dir, 'alpha.postman_collection.json'), '{}');
@@ -190,6 +210,13 @@ describe('resolveCollectionPath', () => {
     expect(warn.mock.calls[0][0]).toContain('alpha.postman_collection.json');
     expect(warn.mock.calls[0][0]).toContain('--collection');
     warn.mockRestore();
+  });
+
+  it('does not discover files inside node_modules', () => {
+    const nm = path.join(tmpDir, 'node_modules', 'some-pkg');
+    fs.mkdirSync(nm, { recursive: true });
+    fs.writeFileSync(path.join(nm, 'test.postman_collection.json'), '{}');
+    expect(() => resolveCollectionPath()).toThrow('No collection file found');
   });
 
   it('throws when no collection can be found', () => {
@@ -220,19 +247,29 @@ describe('resolveEnvironmentPath', () => {
     expect(resolveEnvironmentPath('/abs/env.json')).toBe('/abs/env.json');
   });
 
-  it('returns undefined when no dev/Postman/ dir and no override', () => {
+  it('returns undefined when no environment files exist', () => {
     expect(resolveEnvironmentPath()).toBeUndefined();
   });
 
-  it('auto-discovers the first *.postman_environment.json', () => {
-    const dir = path.join(tmpDir, 'dev', 'Postman');
+  it('auto-discovers an environment file in an arbitrary subdirectory', () => {
+    const dir = path.join(tmpDir, 'postman');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'my-env.postman_environment.json'), '{}');
     expect(resolveEnvironmentPath()).toContain('my-env.postman_environment.json');
   });
 
-  it('returns the alphabetically first file when multiple exist and warns', () => {
-    const dir = path.join(tmpDir, 'dev', 'Postman');
+  it('prefers a shallower environment file over a deeper one', () => {
+    fs.mkdirSync(path.join(tmpDir, 'env'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, 'deep', 'nested'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'deep', 'nested', 'local.postman_environment.json'), '{}');
+    fs.writeFileSync(path.join(tmpDir, 'env', 'local.postman_environment.json'), '{}');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(resolveEnvironmentPath()).toContain(path.join('env', 'local.postman_environment.json'));
+    warn.mockRestore();
+  });
+
+  it('returns the alphabetically first file at the same depth and warns', () => {
+    const dir = path.join(tmpDir, 'postman');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'staging.postman_environment.json'), '{}');
     fs.writeFileSync(path.join(dir, 'local.postman_environment.json'), '{}');
@@ -243,5 +280,12 @@ describe('resolveEnvironmentPath', () => {
     expect(warn.mock.calls[0][0]).toContain('local.postman_environment.json');
     expect(warn.mock.calls[0][0]).toContain('--env');
     warn.mockRestore();
+  });
+
+  it('does not discover files inside node_modules', () => {
+    const nm = path.join(tmpDir, 'node_modules', 'some-pkg');
+    fs.mkdirSync(nm, { recursive: true });
+    fs.writeFileSync(path.join(nm, 'test.postman_environment.json'), '{}');
+    expect(resolveEnvironmentPath()).toBeUndefined();
   });
 });
