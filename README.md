@@ -389,6 +389,42 @@ The CI pipeline runs the full test suite then publishes to npm. The first publis
 
 ---
 
+## Maintenance
+
+### NPM_TOKEN — what it is and how to refresh it
+
+Publishing to npm from CI requires an **Automation token** stored as the `NPM_TOKEN` GitHub Actions secret. The token authenticates the CI job against the npm registry so it can push new package versions without an interactive login.
+
+A weekly workflow ([`.github/workflows/check-npm-token.yml`](.github/workflows/check-npm-token.yml)) pings `https://registry.npmjs.org/-/whoami` every Monday at 09:00 UTC to verify the token is still valid. If the job fails, the token has expired or been revoked and must be replaced before the next release.
+
+**To generate a new token:**
+
+1. Log in to [npmjs.com](https://www.npmjs.com) as the account that owns the `newman-flows` package.
+2. Go to **Account → Access Tokens → Generate New Token → New Granular Access Token**.
+3. Fill in the form as follows:
+
+   | Field                                     | Value                                                                                                                    |
+   | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+   | **Token name**                            | `github-actions-publish` (or any unique name you'll recognise)                                                           |
+   | **Description**                           | `Used by GitHub Actions to publish newman-flows to npm`                                                                  |
+   | **Allowed IP ranges**                     | Leave blank (GitHub Actions IPs change dynamically)                                                                      |
+   | **Packages and scopes → Permissions**     | `Read and write`                                                                                                         |
+   | **Packages and scopes → Select packages** | `newman-flows` (select only this package)                                                                                |
+   | **Organizations → Permissions**           | No access                                                                                                                |
+   | **Expiration**                            | Set a date roughly 1 year out; add a calendar reminder a week before so you don't get caught by the weekly check failing |
+
+4. Click **Generate token** and copy it immediately — it is only shown once.
+
+**To update the secret in GitHub:**
+
+1. Open the repository on GitHub and go to **Settings → Secrets and variables → Actions**.
+2. Find `NPM_TOKEN` and click **Update**.
+3. Paste the new token and save.
+
+The next scheduled check (or a manual trigger of the `Check NPM Token` workflow) should confirm the new token is valid.
+
+---
+
 ## Background
 
 For the full story on why this tool exists — the Postman Enterprise paywall, why Newman folders don't solve the problem, and how the temporary-collection approach works — see [medium-post.md](medium-post.md).
