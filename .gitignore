@@ -4,3 +4,6 @@ test/coverage/
 test/results/
 *.local
 .env*
+
+# CodeGraph index — a local build artefact, never committed.
+.codegraph/
