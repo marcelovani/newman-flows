@@ -44,12 +44,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
-      # Trusted publishing needs npm 11.5.1 or later; Node 20 ships npm 10.
-      - run: npm install -g npm@latest
+      # Trusted publishing needs npm 11.5.1 or later. Pinned to 11 rather than
+      # latest, because a new major can drop support for this Node version.
+      - run: npm install -g npm@^11.5.1
 
       - run: npm ci
 
