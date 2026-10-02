@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- Releases publish through npm trusted publishing (OIDC) instead of an `NPM_TOKEN` secret, so there is no token to renew. The weekly token check is removed.
+
 ## [1.1.0] - 2026-10-02
 
 ### Added
