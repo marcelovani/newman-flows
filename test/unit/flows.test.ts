@@ -499,4 +499,34 @@ describe('buildTempCollection', () => {
     const temp = buildTempCollection(collection, { name: 'F', steps: ['View', 'View'] });
     expect(temp.item).toEqual([view, view]);
   });
+
+  it('keeps collection variables and auth', async () => {
+    const { buildTempCollection } = await import('../../src/commands/run.js');
+    const view: PostmanItem = {
+      name: 'View',
+      request: { method: 'GET', url: { raw: 'http://x' } },
+    };
+    const collection: PostmanCollection = {
+      ...makeCollection([], [{ name: 'Requests', item: [view] }]),
+      variable: [{ key: 'base', value: 'http://x' }],
+      auth: { type: 'bearer', bearer: [{ key: 'token', value: '{{t}}' }] },
+    };
+    const temp = buildTempCollection(collection, { name: 'F', steps: ['View'] });
+    expect(temp.variable).toEqual([{ key: 'base', value: 'http://x' }]);
+    expect(temp.auth).toEqual({ type: 'bearer', bearer: [{ key: 'token', value: '{{t}}' }] });
+  });
+
+  it('adds no variable or auth key when the collection has none', async () => {
+    const { buildTempCollection } = await import('../../src/commands/run.js');
+    const view: PostmanItem = {
+      name: 'View',
+      request: { method: 'GET', url: { raw: 'http://x' } },
+    };
+    const temp = buildTempCollection(makeCollection([], [{ name: 'Requests', item: [view] }]), {
+      name: 'F',
+      steps: ['View'],
+    });
+    expect('variable' in temp).toBe(false);
+    expect('auth' in temp).toBe(false);
+  });
 });

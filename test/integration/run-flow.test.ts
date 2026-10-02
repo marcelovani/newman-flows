@@ -136,10 +136,15 @@ describe('validateCollection (integration)', () => {
  * Write a copy of the example collection with one extra request and one extra
  * flow, so each test controls exactly which steps run.
  */
-function collectionWithFlow(steps: string, extraRequests: unknown[] = []): string {
+function collectionWithFlow(
+  steps: string,
+  extraRequests: unknown[] = [],
+  extra: Record<string, unknown> = {},
+): string {
   const col = JSON.parse(fs.readFileSync(COLLECTION_PATH, 'utf8')) as {
     item: Array<{ name: string; item: unknown[] }>;
   };
+  Object.assign(col, extra);
   col.item.find((i) => i.name === 'Requests')!.item.push(...extraRequests);
   col.item.find((i) => i.name === 'Flows')!.item = [
     {
@@ -180,9 +185,7 @@ const ASSERT_NO_STEP_VARS = healthRequest('Assert no step vars', {
 });
 
 /** Run a flow, writing a JSON report, and return each assertion with its outcome. */
-async function runAndReport(
-  collection: string,
-): Promise<{
+async function runAndReport(collection: string): Promise<{
   failed: boolean;
   assertions: Array<{ step: string; assertion: string; ok: boolean }>;
 }> {
@@ -308,6 +311,60 @@ describe('step variables', () => {
     );
     const { failed, assertions } = await runAndReport(collection);
     expect(assertions.filter((a) => !a.ok)).toEqual([]);
+    expect(failed).toBe(false);
+  }, 30_000);
+});
+
+// ---------------------------------------------------------------------------
+// Collection-level settings
+// ---------------------------------------------------------------------------
+
+describe('collection variables and auth', () => {
+  it('reach the requests in a flow, nested variables included', async () => {
+    const collection = collectionWithFlow(
+      "steps(['Admin login', { step: 'Echo collection settings', vars: { who: 'admin' } }]);",
+      [
+        {
+          name: 'Echo collection settings',
+          request: {
+            method: 'GET',
+            url: { raw: '{{base_url}}/health', host: ['{{base_url}}'], path: ['health'] },
+          },
+          event: [
+            {
+              listen: 'test',
+              script: {
+                type: 'text/javascript',
+                exec: [
+                  "pm.test('collection variable resolved', () => pm.expect(pm.variables.get('greeting')).to.equal('hello'));",
+                  "pm.test('nested collection variable resolved', () => pm.expect(pm.request.headers.get('X-Token')).to.equal(pm.globals.get('admin_access_token')));",
+                  "pm.test('collection auth applied', () => pm.expect(pm.request.headers.get('Authorization')).to.equal('Bearer collection-auth'));",
+                ],
+              },
+            },
+          ],
+        },
+      ],
+      {
+        variable: [
+          { key: 'greeting', value: 'hello' },
+          { key: 'who_token', value: '{{{{who}}_access_token}}' },
+        ],
+        auth: {
+          type: 'bearer',
+          bearer: [{ key: 'token', value: 'collection-auth', type: 'string' }],
+        },
+      },
+    );
+    // The request reads the nested variable through a header.
+    const col = JSON.parse(fs.readFileSync(collection, 'utf8'));
+    const echo = col.item.find((i: { name: string }) => i.name === 'Requests').item.at(-1);
+    echo.request.header = [{ key: 'X-Token', value: '{{who_token}}' }];
+    fs.writeFileSync(collection, JSON.stringify(col));
+
+    const { failed, assertions } = await runAndReport(collection);
+    expect(assertions.filter((a) => a.step.startsWith('Echo') && !a.ok)).toEqual([]);
+    expect(assertions.filter((a) => a.step.startsWith('Echo')).length).toBe(3);
     expect(failed).toBe(false);
   }, 30_000);
 });
