@@ -14,6 +14,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - An `Item access by actor` flow in `examples/my-api` showing one request run as three actors.
 - This changelog, backfilled from the git history.
 
+### Fixed
+
+- Collection variables and collection-level auth now reach the requests in a flow. The collection built for each flow kept the collection's scripts but dropped its `variable` and `auth`, so a request relying on either ran without it.
+
 ## [1.0.1] - 2026-04-20
 
 ### Added

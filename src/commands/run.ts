@@ -135,6 +135,10 @@ export function buildTempCollection(
       const stripped = src.replace(/"(?:[^"\\]|\\.)*"/g, '""').replace(/'(?:[^'\\]|\\.)*'/g, "''");
       return !/\b_flow_steps\b/.test(stripped);
     }),
+    // Collection variables and auth belong to every request in the collection,
+    // so the flow's run needs them as much as the requests do.
+    ...(collection.variable ? { variable: collection.variable } : {}),
+    ...(collection.auth ? { auth: collection.auth } : {}),
     item: flowItems,
   };
 }
