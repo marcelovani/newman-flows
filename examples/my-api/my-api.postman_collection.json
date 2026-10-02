@@ -217,6 +217,49 @@
               ]
             },
             {
+              "name": "View Item As Actor",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// One request for every actor: the flow step says who calls it and what",
+                      "// status to expect, e.g. { step: 'View Item As Actor', vars: { actor: 'member' } }.",
+                      "const actor = pm.variables.get('actor');",
+                      "const token = actor ? pm.globals.get(`${actor}_access_token`) : undefined;",
+                      "if (token) {",
+                      "  pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${token}` });",
+                      "} else {",
+                      "  pm.request.headers.remove('Authorization');",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const expected = Number(pm.variables.get('expected_status') ?? 200);",
+                      "",
+                      "pm.test(`Status code is ${expected}`, () => pm.response.to.have.status(expected));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/items/{{item_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "items", "{{item_id}}"]
+                }
+              },
+              "response": []
+            },
+            {
               "name": "List Items",
               "request": {
                 "method": "GET",
@@ -421,6 +464,33 @@
                   "  'Invite Member',     // uses admin_access_token + item_id + member_email → sets invitation_id",
                   "  'Accept Invitation', // uses member_access_token + invitation_id",
                   "  'View Members',      // uses admin_access_token + item_id — asserts member_id appears",
+                  "]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Item access by actor",
+          "request": {
+            "method": "FLOW",
+            "url": { "raw": "about:blank", "host": ["about:blank"] }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Step variables: one request, run as several actors with the status each should get.",
+                  "// Run: npx newman-flows run \"Item access by actor\"",
+                  "steps([",
+                  "  'Admin login',  // sets admin_access_token",
+                  "  'Member login', // sets member_access_token",
+                  "  'Create Item',  // sets item_id",
+                  "  { step: 'View Item As Actor', vars: { actor: 'admin', expected_status: 200 } },",
+                  "  { step: 'View Item As Actor', vars: { actor: 'member', expected_status: 200 } },",
+                  "  { step: 'View Item As Actor', vars: { actor: 'anonymous', expected_status: 401 } },",
                   "]);"
                 ]
               }

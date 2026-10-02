@@ -47,8 +47,8 @@ function makeCollection(
 describe('runSandboxed', () => {
   it('captures a valid steps() call', () => {
     expect(runSandboxed('My Flow', "steps(['Login', 'Create Org']);")).toEqual([
-      'Login',
-      'Create Org',
+      { step: 'Login' },
+      { step: 'Create Org' },
     ]);
   });
 
@@ -83,8 +83,8 @@ describe('runSandboxed', () => {
   it('allows step names that contain forbidden words as substrings inside strings', () => {
     // "Create prototype" — "prototype" is inside a string literal, not an identifier
     expect(runSandboxed('My Flow', "steps(['Create prototype', 'Login']);")).toEqual([
-      'Create prototype',
-      'Login',
+      { step: 'Create prototype' },
+      { step: 'Login' },
     ]);
   });
 
@@ -124,6 +124,80 @@ describe('runSandboxed', () => {
 // ---------------------------------------------------------------------------
 // listFlows
 // ---------------------------------------------------------------------------
+
+describe('runSandboxed — step objects', () => {
+  it('accepts { step, vars } alongside plain names', () => {
+    expect(
+      runSandboxed(
+        'My Flow',
+        "steps(['Login', { step: 'View', vars: { actor: 'member', expected_status: 403, strict: true } }]);",
+      ),
+    ).toEqual([
+      { step: 'Login' },
+      { step: 'View', vars: { actor: 'member', expected_status: 403, strict: true } },
+    ]);
+  });
+
+  it('accepts an object with no vars, and drops an empty vars', () => {
+    expect(runSandboxed('My Flow', "steps([{ step: 'A' }, { step: 'B', vars: {} }]);")).toEqual([
+      { step: 'A' },
+      { step: 'B' },
+    ]);
+  });
+
+  it('returns plain objects, not objects from the vm context', () => {
+    const [step] = runSandboxed('My Flow', "steps([{ step: 'A', vars: { x: 1 } }]);");
+    expect(Object.getPrototypeOf(step)).toBe(Object.prototype);
+    expect(Object.getPrototypeOf(step.vars)).toBe(Object.prototype);
+  });
+
+  it('rejects an object without a step', () => {
+    expect(() => runSandboxed('F', 'steps([{ vars: { a: 1 } }]);')).toThrow(
+      'needs a non-empty "step" string',
+    );
+  });
+
+  it('rejects an empty step name in an object', () => {
+    expect(() => runSandboxed('F', "steps([{ step: '' }]);")).toThrow(
+      'needs a non-empty "step" string',
+    );
+  });
+
+  it('rejects unknown keys, naming them', () => {
+    expect(() => runSandboxed('F', "steps([{ step: 'A', expect: 403 }]);")).toThrow(
+      'unknown key(s): expect',
+    );
+  });
+
+  it('rejects vars that is not an object', () => {
+    expect(() => runSandboxed('F', "steps([{ step: 'A', vars: 'x' }]);")).toThrow(
+      '"vars" must be an object',
+    );
+    expect(() => runSandboxed('F', "steps([{ step: 'A', vars: [1] }]);")).toThrow(
+      '"vars" must be an object',
+    );
+  });
+
+  it('rejects a var value that is not a string, number or boolean', () => {
+    expect(() => runSandboxed('F', "steps([{ step: 'A', vars: { a: { b: 1 } } }]);")).toThrow(
+      'vars.a must be a string, number or boolean',
+    );
+    expect(() => runSandboxed('F', "steps([{ step: 'A', vars: { a: null } }]);")).toThrow(
+      'vars.a must be a string, number or boolean',
+    );
+  });
+
+  it('rejects a var name that cannot be used as a variable', () => {
+    expect(() => runSandboxed('F', "steps([{ step: 'A', vars: { 'has space': 1 } }]);")).toThrow(
+      'is not a valid variable name',
+    );
+  });
+
+  it('rejects null and arrays as steps', () => {
+    expect(() => runSandboxed('F', 'steps([null]);')).toThrow('index 0 has type null');
+    expect(() => runSandboxed('F', "steps([['A']]);")).toThrow('index 0 has type array');
+  });
+});
 
 describe('listFlows', () => {
   it('returns all direct request items in the Flows/ folder', () => {
@@ -176,6 +250,21 @@ describe('extractFlowDef', () => {
       ['// Run: newman-flows run "Multi-line"', 'steps([', '  "Step One",', '  "Step Two"', ']);'],
     );
     expect(extractFlowDef(req).steps).toEqual(['Step One', 'Step Two']);
+  });
+
+  it('keeps step names in steps and the variables in stepDefs', () => {
+    const req = makeFlowRequest(
+      'Mixed',
+      [],
+      ["steps(['Login', { step: 'View', vars: { actor: 'member' } }, 'View']);"],
+    );
+    const def = extractFlowDef(req);
+    expect(def.steps).toEqual(['Login', 'View', 'View']);
+    expect(def.stepDefs).toEqual([
+      { step: 'Login' },
+      { step: 'View', vars: { actor: 'member' } },
+      { step: 'View' },
+    ]);
   });
 
   it('throws when the pre-request script is missing', () => {
@@ -318,5 +407,96 @@ describe('buildTempCollection', () => {
     expect(() =>
       buildTempCollection(collection, { name: 'Bad Flow', steps: ['Missing Step'] }),
     ).toThrow('Step "Missing Step" not found');
+  });
+
+  it("adds the step's variables as a pre-request event ahead of the request's own", async () => {
+    const { buildTempCollection } = await import('../../src/commands/run.js');
+    const view: PostmanItem = {
+      name: 'View',
+      request: { method: 'GET', url: { raw: 'http://x/v' } },
+      event: [
+        { listen: 'prerequest', script: { type: 'text/javascript', exec: ['own();'] } },
+        { listen: 'test', script: { type: 'text/javascript', exec: ['pm.test("t", () => {});'] } },
+      ],
+    };
+    const collection = makeCollection([], [{ name: 'Requests', item: [view] }]);
+    const temp = buildTempCollection(collection, {
+      name: 'F',
+      steps: ['View'],
+      stepDefs: [{ step: 'View', vars: { actor: 'member', expected_status: 403 } }],
+    });
+    const item = (temp.item as PostmanItem[])[0];
+    expect(item.name).toBe('View [actor=member, expected_status=403]');
+    expect(item.event?.map((e) => e.listen)).toEqual(['prerequest', 'prerequest', 'test']);
+    const setExec = item.event![0].script.exec.join('\n');
+    expect(setExec).toContain('const vars = {"actor":"member","expected_status":403};');
+    expect(item.event![1].script.exec).toEqual(['own();']);
+    // Nothing is added to the test script: an error there must not skip the clean-up.
+    expect(item.event![2].script.exec).toEqual(['pm.test("t", () => {});']);
+  });
+
+  it('serialises values as JSON, so quotes in a value cannot break the script', async () => {
+    const { buildTempCollection } = await import('../../src/commands/run.js');
+    const bare: PostmanItem = {
+      name: 'Bare',
+      request: { method: 'GET', url: { raw: 'http://x' } },
+    };
+    const collection = makeCollection([], [{ name: 'Requests', item: [bare] }]);
+    const temp = buildTempCollection(collection, {
+      name: 'F',
+      steps: ['Bare'],
+      stepDefs: [{ step: 'Bare', vars: { q: 'it\'s "quoted"' } }],
+    });
+    const exec = (temp.item as PostmanItem[])[0].event![0].script.exec.join('\n');
+    expect(exec).toContain(`const vars = ${JSON.stringify({ q: 'it\'s "quoted"' })};`);
+  });
+
+  it('restores at the start of every step after the first step with variables, and only there', async () => {
+    const { buildTempCollection } = await import('../../src/commands/run.js');
+    const view: PostmanItem = {
+      name: 'View',
+      request: { method: 'GET', url: { raw: 'http://x' } },
+    };
+    const collection = makeCollection([], [{ name: 'Requests', item: [view] }]);
+    const temp = buildTempCollection(collection, {
+      name: 'F',
+      steps: ['View', 'View', 'View', 'View'],
+      stepDefs: [
+        { step: 'View' },
+        { step: 'View', vars: { actor: 'admin' } },
+        { step: 'View', vars: { actor: 'member' } },
+        { step: 'View' },
+      ],
+    });
+    const items = temp.item as PostmanItem[];
+    expect(items.map((i) => i.name)).toEqual([
+      'View',
+      'View [actor=admin]',
+      'View [actor=member]',
+      'View',
+    ]);
+    const firstLines = items.map((i) => (i.event ?? []).map((e) => e.script.exec[0]));
+    expect(firstLines).toEqual([
+      [],
+      ["// newman-flows: this step's variables."],
+      [
+        "// newman-flows: restore what the previous step's variables replaced.",
+        "// newman-flows: this step's variables.",
+      ],
+      ["// newman-flows: restore what the previous step's variables replaced."],
+    ]);
+    // The collection's own request is untouched — each step got a copy.
+    expect(view.event).toBeUndefined();
+  });
+
+  it('leaves a flow without variables exactly as before', async () => {
+    const { buildTempCollection } = await import('../../src/commands/run.js');
+    const view: PostmanItem = {
+      name: 'View',
+      request: { method: 'GET', url: { raw: 'http://x' } },
+    };
+    const collection = makeCollection([], [{ name: 'Requests', item: [view] }]);
+    const temp = buildTempCollection(collection, { name: 'F', steps: ['View', 'View'] });
+    expect(temp.item).toEqual([view, view]);
   });
 });

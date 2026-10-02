@@ -63,10 +63,30 @@ export interface PostmanCollection {
   variable?: Array<{ key: string; value: string; type?: string }>;
 }
 
-/** A resolved flow definition: name + ordered step names. */
+/** A value a flow step may pass to its request. */
+export type StepVarValue = string | number | boolean;
+
+/**
+ * One step of a flow: the request to run and, optionally, variables to set
+ * for that request only. A plain string in `steps([...])` becomes
+ * `{ step: '<name>' }`.
+ */
+export interface FlowStep {
+  step: string;
+  vars?: Record<string, StepVarValue>;
+}
+
+/** A resolved flow definition: name + ordered steps. */
 export interface FlowDef {
   name: string;
+  /** Request names, in order. One entry per step, repeats included. */
   steps: string[];
+  /**
+   * The same steps with their variables. Optional so that a hand-built
+   * `FlowDef` with names only keeps working; when absent, every step runs
+   * with no variables.
+   */
+  stepDefs?: FlowStep[];
 }
 
 /** Options shared by run-related commands. */
