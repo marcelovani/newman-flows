@@ -61,6 +61,8 @@ export interface PostmanCollection {
   item: PostmanItem[];
   event?: PostmanEvent[];
   variable?: Array<{ key: string; value: string; type?: string }>;
+  /** Collection-level auth, inherited by every request set to inherit it. */
+  auth?: Record<string, unknown>;
 }
 
 /** A value a flow step may pass to its request. */
