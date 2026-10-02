@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-02
+
 ### Added
 
 - Step variables. A step in `steps([...])` can be an object, `{ step: 'View Item', vars: { actor: 'member', expected_status: 403 } }`, to run the same request with different values. The variables are set before the request's own pre-request script and last for that step only: the next step removes them and puts back any value they replaced, even if the step's tests threw or its request was skipped. The step is reported as `View Item [actor=member, expected_status=403]`. Plain string steps work exactly as before.
@@ -59,6 +61,7 @@ First public release as `newman-flows`.
 - A pre-push hook running format, lint, typecheck and unit tests.
 - CI running lint, typecheck, unit and integration tests, and publishing to npm on a `v*` tag.
 
-[Unreleased]: https://github.com/marcelovani/newman-flows/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/marcelovani/newman-flows/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/marcelovani/newman-flows/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/marcelovani/newman-flows/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/marcelovani/newman-flows/releases/tag/v1.0.0

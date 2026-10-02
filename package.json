@@ -1,6 +1,6 @@
 {
   "name": "newman-flows",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Multi-step Postman flow runner for the free plan — no Enterprise required. Sits on top of Newman and adds flow orchestration: define ordered sequences of named requests inside your Postman collection, run them with a single CLI command.",
   "keywords": [
     "newman",
