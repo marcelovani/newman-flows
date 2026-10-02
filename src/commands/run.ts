@@ -19,11 +19,89 @@ import {
   resolveEnvironmentPath,
 } from '../lib/collection.js';
 import { extractFlowDef, findFlowRequest, listFlows } from '../lib/flows.js';
-import type { FlowDef, PostmanCollection, RunOptions } from '../lib/types.js';
+import type {
+  FlowDef,
+  FlowStep,
+  PostmanCollection,
+  PostmanEvent,
+  PostmanItem,
+  RunOptions,
+  StepVarValue,
+} from '../lib/types.js';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/** The name a step runs and reports under: `View Item [actor=member]`. */
+export function stepLabel(step: FlowStep): string {
+  if (!step.vars) return step.step;
+  const pairs = Object.entries(step.vars).map(([k, v]) => `${k}=${v}`);
+  return `${step.step} [${pairs.join(', ')}]`;
+}
+
+/** Where a step's variables park the values they replaced, until the next step. */
+const SAVED_VAR = '__newman_flows_saved';
+
+/**
+ * Put back whatever the previous step's variables replaced: unset each one,
+ * and set it again only if it held something the unset did not reveal —
+ * a value from a lower scope (environment, globals) comes back by itself.
+ */
+const RESTORE_SCRIPT = [
+  "// newman-flows: restore what the previous step's variables replaced.",
+  `const saved = pm.variables.get('${SAVED_VAR}');`,
+  'if (saved !== undefined) {',
+  `  pm.variables.unset('${SAVED_VAR}');`,
+  '  for (const [key, prev] of Object.entries(JSON.parse(saved))) {',
+  '    pm.variables.unset(key);',
+  '    if (prev.had && pm.variables.get(key) !== prev.value) pm.variables.set(key, prev.value);',
+  '  }',
+  '}',
+];
+
+/** Record what each variable holds now, then set the step's values. */
+function setScript(vars: Record<string, StepVarValue>): string[] {
+  return [
+    "// newman-flows: this step's variables.",
+    `const vars = ${JSON.stringify(vars)};`,
+    'const saved = {};',
+    'for (const key of Object.keys(vars)) {',
+    '  saved[key] = { had: pm.variables.has(key), value: pm.variables.get(key) };',
+    '}',
+    `pm.variables.set('${SAVED_VAR}', JSON.stringify(saved));`,
+    'for (const [key, value] of Object.entries(vars)) pm.variables.set(key, value);',
+  ];
+}
+
+function prerequest(exec: string[]): PostmanEvent {
+  return { listen: 'prerequest', script: { type: 'text/javascript', exec } };
+}
+
+/**
+ * Copy a request for one step, adding pre-request events ahead of its own:
+ * one restoring what the previous step's variables replaced, and, when this
+ * step has variables, one setting them.
+ *
+ * The restore runs at the start of the *next* step rather than after this
+ * step's tests, because nothing after a test script is guaranteed to run — it
+ * can throw, or the request can be skipped — and `pm.variables` lives for the
+ * whole run, so a missed clean-up would reach every step after it. They are
+ * separate events so that an error in the request's own script cannot stop them.
+ */
+function withStepVars(req: PostmanItem, step: FlowStep, restore: boolean): PostmanItem {
+  if (!step.vars && !restore) return req;
+
+  const item = structuredClone(req);
+  const added: PostmanEvent[] = [];
+  if (restore) added.push(prerequest(RESTORE_SCRIPT));
+  if (step.vars) {
+    added.push(prerequest(setScript(step.vars)));
+    item.name = stepLabel(step);
+  }
+  item.event = [...added, ...(item.event ?? [])];
+  return item;
+}
 
 /**
  * Build the temporary flat collection that Newman will run.
@@ -33,10 +111,13 @@ export function buildTempCollection(
   collection: PostmanCollection,
   flowDef: FlowDef,
 ): Record<string, unknown> {
-  const flowItems = flowDef.steps.map((stepName) => {
-    const req = findRequest(collection.item, stepName);
-    if (!req) throw new Error(`Step "${stepName}" not found in collection.`);
-    return req;
+  const stepDefs: FlowStep[] = flowDef.stepDefs ?? flowDef.steps.map((step) => ({ step }));
+  const flowItems = stepDefs.map((step, i) => {
+    const req = findRequest(collection.item, step.step);
+    if (!req) throw new Error(`Step "${step.step}" not found in collection.`);
+    // Only a step after one with variables has anything to restore.
+    const restore = stepDefs.slice(0, i).some((s) => s.vars);
+    return withStepVars(req, step, restore);
   });
 
   return {
@@ -70,7 +151,8 @@ async function runFlowDef(
     const tempCollection = buildTempCollection(collection, flowDef);
 
     console.log(`\n▶ Running flow: ${flowDef.name}`);
-    console.log(`  Steps: ${flowDef.steps.join(' → ')}\n`);
+    const labels = flowDef.stepDefs?.map(stepLabel) ?? flowDef.steps;
+    console.log(`  Steps: ${labels.join(' → ')}\n`);
 
     newman.run(
       {

@@ -6,6 +6,11 @@
  *
  *   steps(['Step One', 'Step Two', ...]);
  *
+ * A step can also be an object, to run the same request with different
+ * variables — a different user, a different expected status:
+ *
+ *   steps(['Admin login', { step: 'View Item', vars: { actor: 'member' } }]);
+ *
  * The steps array is captured by running the script in a Node.js vm context.
  *
  * SECURITY NOTE: vm.runInNewContext() is NOT a security sandbox — it cannot
@@ -17,7 +22,7 @@
 
 import * as vm from 'vm';
 import { findFolder } from './collection.js';
-import type { FlowDef, PostmanCollection, PostmanItem } from './types.js';
+import type { FlowDef, FlowStep, PostmanCollection, PostmanItem, StepVarValue } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Sandbox helpers
@@ -59,22 +64,74 @@ function assertSafeSrc(flowName: string, src: string): void {
   }
 }
 
+/** A variable name usable as `{{name}}` and with `pm.variables.get()`. */
+const VAR_NAME = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
+
+/**
+ * Turn one element of the steps() array into a FlowStep, or throw.
+ * Objects come from the vm context, so they are copied rather than kept.
+ */
+function parseStep(s: unknown, i: number): FlowStep {
+  if (typeof s === 'string') {
+    if (s === '') {
+      throw new Error(`steps() array must not contain empty strings (empty string at index ${i})`);
+    }
+    return { step: s };
+  }
+
+  if (typeof s !== 'object' || s === null || Array.isArray(s)) {
+    throw new Error(
+      `steps() array must contain only strings or { step, vars } objects (index ${i} has type ${s === null ? 'null' : Array.isArray(s) ? 'array' : typeof s})`,
+    );
+  }
+
+  const obj = s as Record<string, unknown>;
+  const unknownKeys = Object.keys(obj).filter((k) => k !== 'step' && k !== 'vars');
+  if (unknownKeys.length > 0) {
+    throw new Error(
+      `steps() object at index ${i} has unknown key(s): ${unknownKeys.join(', ')} — only "step" and "vars" are allowed`,
+    );
+  }
+  if (typeof obj.step !== 'string' || obj.step === '') {
+    throw new Error(`steps() object at index ${i} needs a non-empty "step" string`);
+  }
+  if (obj.vars === undefined) return { step: obj.step };
+
+  if (typeof obj.vars !== 'object' || obj.vars === null || Array.isArray(obj.vars)) {
+    throw new Error(`steps() object at index ${i}: "vars" must be an object`);
+  }
+  const vars: Record<string, StepVarValue> = {};
+  for (const [key, value] of Object.entries(obj.vars as Record<string, unknown>)) {
+    if (!VAR_NAME.test(key)) {
+      throw new Error(`steps() object at index ${i}: "${key}" is not a valid variable name`);
+    }
+    if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+      throw new Error(
+        `steps() object at index ${i}: vars.${key} must be a string, number or boolean`,
+      );
+    }
+    vars[key] = value;
+  }
+  return Object.keys(vars).length > 0 ? { step: obj.step, vars } : { step: obj.step };
+}
+
 /**
  * Run a flow pre-request script in a vm context and return the captured steps.
  *
  * Applies:
  *   - Pre-flight check for dangerous identifiers
  *   - 1-second hard timeout (prevents infinite loops)
- *   - Runtime validation that steps() receives a non-empty array of non-empty strings
+ *   - Runtime validation that steps() receives a non-empty array of step
+ *     names or { step, vars } objects
  *
  * Throws a descriptive Error on any violation.
  *
  * @internal — exported for use by validate.ts; not part of the public API.
  */
-export function runSandboxed(flowName: string, scriptSrc: string): string[] {
+export function runSandboxed(flowName: string, scriptSrc: string): FlowStep[] {
   assertSafeSrc(flowName, scriptSrc);
 
-  let capturedSteps: string[] | null = null;
+  let capturedSteps: FlowStep[] | null = null;
 
   try {
     vm.runInNewContext(
@@ -84,20 +141,7 @@ export function runSandboxed(flowName: string, scriptSrc: string): string[] {
           if (!Array.isArray(stepsArray)) {
             throw new Error('steps() argument must be an array');
           }
-          for (let i = 0; i < stepsArray.length; i++) {
-            const s = stepsArray[i];
-            if (typeof s !== 'string') {
-              throw new Error(
-                `steps() array must contain only strings (index ${i} has type ${typeof s})`,
-              );
-            }
-            if (s === '') {
-              throw new Error(
-                `steps() array must not contain empty strings (empty string at index ${i})`,
-              );
-            }
-          }
-          capturedSteps = stepsArray as string[];
+          capturedSteps = stepsArray.map(parseStep);
         },
       },
       { timeout: VM_TIMEOUT_MS },
@@ -108,7 +152,7 @@ export function runSandboxed(flowName: string, scriptSrc: string): string[] {
     );
   }
 
-  if (!capturedSteps || (capturedSteps as string[]).length === 0) {
+  if (!capturedSteps || (capturedSteps as FlowStep[]).length === 0) {
     throw new Error(`No valid steps() call found in pre-request script of "${flowName}".`);
   }
 
@@ -132,7 +176,7 @@ export function listFlows(collection: PostmanCollection): PostmanItem[] {
 }
 
 /**
- * Extract the step names from a flow request's pre-request script.
+ * Extract the steps from a flow request's pre-request script.
  * Throws if the script is missing, invalid, or does not call steps().
  */
 export function extractFlowDef(flowReq: PostmanItem): FlowDef {
@@ -142,8 +186,8 @@ export function extractFlowDef(flowReq: PostmanItem): FlowDef {
   }
 
   const scriptSrc = preReq.script.exec.join('\n');
-  const steps = runSandboxed(flowReq.name, scriptSrc);
-  return { name: flowReq.name, steps };
+  const stepDefs = runSandboxed(flowReq.name, scriptSrc);
+  return { name: flowReq.name, steps: stepDefs.map((s) => s.step), stepDefs };
 }
 
 /**

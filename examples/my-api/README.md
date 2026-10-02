@@ -1,6 +1,6 @@
 # Example: My API
 
-A complete, runnable example of a `newman-flows` collection. It demonstrates the two main patterns — a single-persona flow and a multi-persona flow — using a simple Items API.
+A complete, runnable example of a `newman-flows` collection. It demonstrates the three main patterns — a single-persona flow, a multi-persona flow, and one request run as several actors with step variables — using a simple Items API.
 
 ---
 
@@ -53,6 +53,7 @@ my-api.postman_collection.json
 │   │   ├── Create Item
 │   │   ├── Edit Item
 │   │   ├── View Item
+│   │   ├── View Item As Actor ← run once per actor, via step variables
 │   │   └── List Items
 │   ├── Invitations/
 │   │   ├── Invite Member
@@ -61,7 +62,8 @@ my-api.postman_collection.json
 │       └── View Members
 └── Flows/                     ← each entry is a FLOW-method request
     ├── Create and edit item   ← single-persona flow
-    └── Member invitation      ← multi-persona flow
+    ├── Member invitation      ← multi-persona flow
+    └── Item access by actor   ← one request, several actors (step variables)
 ```
 
 Requests are defined **exactly once**. Flows reference them by name — no duplication.
@@ -87,7 +89,7 @@ These are not in the environment file — they are written by one step and read 
 | Variable              | Set by        | Used by                                                                    |
 | --------------------- | ------------- | -------------------------------------------------------------------------- |
 | `admin_access_token`  | Admin login   | Create Item, Edit Item, View Item, List Items, Invite Member, View Members |
-| `member_access_token` | Member login  | Accept Invitation                                                          |
+| `member_access_token` | Member login  | Accept Invitation, View Item As Actor                                      |
 | `member_id`           | Member login  | View Members (asserts member appears)                                      |
 | `member_email`        | Member login  | Invite Member body                                                         |
 | `item_id`             | Create Item   | Edit Item, View Item, Invite Member, View Members                          |
@@ -134,6 +136,31 @@ Member login ─→ member_access_token, member_id, member_email
 ```
 
 **Why two named tokens?** If both logins stored their result in the same `access_token` variable, the second login would overwrite it. Each persona gets its own variable (`admin_access_token`, `member_access_token`) and every request explicitly uses the correct one.
+
+---
+
+## Flow 3 — Item access by actor (step variables)
+
+One request, `View Item As Actor`, run three times. Each step passes the actor making the call and the status that actor should get, instead of keeping a copy of the request per actor.
+
+```javascript
+steps([
+  'Admin login',
+  'Member login',
+  'Create Item',
+  { step: 'View Item As Actor', vars: { actor: 'admin', expected_status: 200 } },
+  { step: 'View Item As Actor', vars: { actor: 'member', expected_status: 200 } },
+  { step: 'View Item As Actor', vars: { actor: 'anonymous', expected_status: 401 } },
+]);
+```
+
+The request's pre-request script picks the `<actor>_access_token` global, or sends no `Authorization` header when there is none, and its test asserts `expected_status` (200 by default). The report lists each run separately, e.g. `View Item As Actor [actor=anonymous, expected_status=401]`.
+
+| Step                                   | Assertions |
+| -------------------------------------- | ---------- |
+| View Item As Actor `[actor=admin]`     | 200        |
+| View Item As Actor `[actor=member]`    | 200        |
+| View Item As Actor `[actor=anonymous]` | 401        |
 
 ---
 

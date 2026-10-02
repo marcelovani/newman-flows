@@ -269,3 +269,34 @@ describe('printValidationResult', () => {
     vi.restoreAllMocks();
   });
 });
+
+// ---------------------------------------------------------------------------
+// validateCollection — step objects
+// ---------------------------------------------------------------------------
+
+describe('validateCollection — step objects', () => {
+  function withSteps(exec: string): PostmanCollection {
+    const col = makeCollection();
+    const flow = col.item[1].item![0];
+    flow.event![0].script.exec = [exec];
+    return col;
+  }
+
+  it('accepts a flow mixing names and { step, vars } objects', () => {
+    const result = validateCollection(
+      withSteps("steps(['Login', { step: 'View Org', vars: { actor: 'member' } }]);"),
+    );
+    expect(result.errors).toHaveLength(0);
+    expect(result.validFlows).toEqual({ Onboarding: 2 });
+  });
+
+  it('reports a step object whose name does not resolve', () => {
+    const result = validateCollection(withSteps("steps([{ step: 'Nope', vars: { a: 1 } }]);"));
+    expect(result.errors).toContain('"Onboarding": step "Nope" not found in collection');
+  });
+
+  it('reports a malformed step object against its flow', () => {
+    const result = validateCollection(withSteps("steps([{ step: 'Login', expect: 403 }]);"));
+    expect(result.errors[0]).toMatch(/^"Onboarding": .*unknown key\(s\): expect/);
+  });
+});

@@ -54,6 +54,12 @@ steps(['Admin login', 'Create Item', 'Edit Item', 'View Item']);
 
 Step names must **exactly match** request names in `Requests/`.
 
+A step can also be an object, to pass variables to that one request — see [Step variables](#step-variables):
+
+```javascript
+steps(['Admin login', 'Create Item', { step: 'View Item As Actor', vars: { actor: 'member' } }]);
+```
+
 ### Variables between steps
 
 Earlier steps set `pm.globals` variables that later steps consume:
@@ -159,6 +165,53 @@ steps([
   'View Members', // asserts member_id appears in the list
 ]);
 ```
+
+### Step variables
+
+Often the same request needs checking more than once: as the admin, as a member, as nobody, each expecting a different status. Copying the request for every case leaves several near-identical requests to keep in step. Instead, keep **one** request and let each step pass the values that differ:
+
+```javascript
+// Run: newman-flows run "Item access by actor"
+steps([
+  'Admin login', // sets admin_access_token
+  'Member login', // sets member_access_token
+  'Create Item', // sets item_id
+  { step: 'View Item As Actor', vars: { actor: 'admin', expected_status: 200 } },
+  { step: 'View Item As Actor', vars: { actor: 'member', expected_status: 200 } },
+  { step: 'View Item As Actor', vars: { actor: 'anonymous', expected_status: 401 } },
+]);
+```
+
+The request reads them with `pm.variables.get()`, or as `{{actor}}` in a URL, header or body:
+
+```javascript
+// "View Item As Actor" — Pre-request tab:
+const actor = pm.variables.get('actor');
+const token = actor ? pm.globals.get(`${actor}_access_token`) : undefined;
+if (token) {
+  pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${token}` });
+} else {
+  pm.request.headers.remove('Authorization');
+}
+```
+
+```javascript
+// "View Item As Actor" — Tests tab:
+const expected = Number(pm.variables.get('expected_status') ?? 200);
+
+pm.test(`Status code is ${expected}`, () => pm.response.to.have.status(expected));
+```
+
+How it behaves:
+
+- A step object has `step` (the request name) and optionally `vars`. No other keys are allowed.
+- Variable names follow the `{{name}}` rules; values are strings, numbers or booleans.
+- The variables are set **before** the request's own pre-request script and last for that step only. At the start of the next step they are taken away again — even if the step's test script threw or the request was skipped — and any value they replaced, from an earlier step or from globals, is put back.
+- The step is reported under its variables — `View Item As Actor [actor=member, expected_status=200]` — so a failure says which case broke.
+- Plain string steps and step objects mix freely in one flow.
+- `newman-flows validate` checks the shape and that every `step` names a real request.
+
+Give the request sensible defaults (`?? 200` above) so it still runs on its own from Postman.
 
 ---
 
@@ -376,6 +429,8 @@ npm install -g ./newman-flows-x.y.z.tgz
 ```
 
 ### Releasing
+
+Move the `[Unreleased]` entries in [CHANGELOG.md](CHANGELOG.md) under a heading for the new version, with today's date, and update the compare links at the bottom. Then:
 
 ```bash
 # Bump version, commit, and tag

@@ -6,6 +6,7 @@
  *   - Required info fields present (name, schema, _postman_id)
  *   - No absolute file paths in body.file.src or body.formdata[].src
  *   - All flow pre-request scripts call steps([...]) correctly (new syntax)
+ *   - Every step (a name or a { step, vars } object) is well-formed
  *   - All step names in flow definitions resolve to a real request
  *   - No duplicate request names (causes ambiguous step resolution)
  *
@@ -17,7 +18,7 @@
 import * as path from 'path';
 import { findFolder } from '../lib/collection.js';
 import { runSandboxed } from '../lib/flows.js';
-import type { PostmanCollection, PostmanItem } from '../lib/types.js';
+import type { FlowStep, PostmanCollection, PostmanItem } from '../lib/types.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -139,7 +140,7 @@ export function validateCollection(collection: PostmanCollection): ValidationRes
       }
 
       // Extract and validate steps via the shared hardened sandbox
-      let steps: string[];
+      let steps: FlowStep[];
       try {
         steps = runSandboxed(flowReq.name, scriptSrc);
       } catch (e) {
@@ -149,7 +150,7 @@ export function validateCollection(collection: PostmanCollection): ValidationRes
 
       // Resolve each step name against the request index
       let allStepsValid = true;
-      for (const step of steps) {
+      for (const { step } of steps) {
         if (!requestNames.has(step)) {
           errors.push(`"${flowReq.name}": step "${step}" not found in collection`);
           allStepsValid = false;

@@ -13,7 +13,7 @@
  */
 
 export { getFlowSummaries, printFlowList } from './commands/list.js';
-export { runFlow, runAllFlows } from './commands/run.js';
+export { runFlow, runAllFlows, stepLabel } from './commands/run.js';
 export { validateCollection, printValidationResult } from './commands/validate.js';
 export {
   loadCollection,
@@ -25,6 +25,7 @@ export {
 export { listFlows, extractFlowDef, findFlowRequest } from './lib/flows.js';
 export type {
   FlowDef,
+  FlowStep,
   PostmanBody,
   PostmanCollection,
   PostmanEvent,
@@ -34,6 +35,7 @@ export type {
   PostmanRequest,
   PostmanScript,
   RunOptions,
+  StepVarValue,
 } from './lib/types.js';
 export type { FlowSummary } from './commands/list.js';
 export type { ValidationResult } from './commands/validate.js';
