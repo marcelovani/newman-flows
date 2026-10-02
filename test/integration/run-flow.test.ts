@@ -180,9 +180,7 @@ const ASSERT_NO_STEP_VARS = healthRequest('Assert no step vars', {
 });
 
 /** Run a flow, writing a JSON report, and return each assertion with its outcome. */
-async function runAndReport(
-  collection: string,
-): Promise<{
+async function runAndReport(collection: string): Promise<{
   failed: boolean;
   assertions: Array<{ step: string; assertion: string; ok: boolean }>;
 }> {
