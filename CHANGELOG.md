@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-10-02
+
 ### Changed
 
 - Releases publish through npm trusted publishing (OIDC) instead of an `NPM_TOKEN` secret, so there is no token to renew. The weekly token check is removed.
@@ -65,7 +67,8 @@ First public release as `newman-flows`.
 - A pre-push hook running format, lint, typecheck and unit tests.
 - CI running lint, typecheck, unit and integration tests, and publishing to npm on a `v*` tag.
 
-[Unreleased]: https://github.com/marcelovani/newman-flows/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/marcelovani/newman-flows/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/marcelovani/newman-flows/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/marcelovani/newman-flows/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/marcelovani/newman-flows/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/marcelovani/newman-flows/releases/tag/v1.0.0
