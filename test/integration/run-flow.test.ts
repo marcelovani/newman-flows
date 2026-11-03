@@ -2,9 +2,9 @@
  * Integration tests for the newman-flows run command.
  *
  * These tests start the mock server (via setup.ts), load the fixture
- * collection, and run each flow end-to-end through newman.run() to verify
+ * collection, and run each flow end-to-end through the Postman CLI to verify
  * that the full pipeline works: step extraction → temp collection assembly →
- * Newman execution → assertions.
+ * Postman CLI execution → assertions.
  *
  * Results are written to a temp directory so they don't pollute the repo.
  */
@@ -204,13 +204,17 @@ async function runAndReport(collection: string): Promise<{
   const json = JSON.parse(fs.readFileSync(report, 'utf8')) as {
     run: {
       executions: Array<{
-        item: { name: string };
-        assertions?: Array<{ assertion: string; error?: unknown }>;
+        requestExecuted: { name: string };
+        tests?: Array<{ name: string; status: string }>;
       }>;
     };
   };
   const assertions = json.run.executions.flatMap((e) =>
-    (e.assertions ?? []).map((a) => ({ step: e.item.name, assertion: a.assertion, ok: !a.error })),
+    (e.tests ?? []).map((t) => ({
+      step: e.requestExecuted.name,
+      assertion: t.name,
+      ok: t.status === 'passed',
+    })),
   );
   return { failed, assertions };
 }
@@ -222,7 +226,7 @@ describe('step variables', () => {
       "steps(['Admin login', 'Create Item', { step: 'View Item As Actor', vars: { actor: 'anonymous', expected_status: 200 } }]);",
     );
     await expect(runFlow({ collection, flow: 'Under test', env: envPath })).rejects.toThrow(
-      'failure',
+      'failed',
     );
   }, 30_000);
 
@@ -251,9 +255,9 @@ describe('step variables', () => {
       reporter: { json: { export: report } },
     });
     const json = JSON.parse(fs.readFileSync(report, 'utf8')) as {
-      run: { executions: Array<{ item: { name: string } }> };
+      run: { executions: Array<{ requestExecuted: { name: string } }> };
     };
-    expect(json.run.executions.map((e) => e.item.name)).toEqual([
+    expect(json.run.executions.map((e) => e.requestExecuted.name)).toEqual([
       'Admin login',
       'Create Item',
       'View Item As Actor [actor=admin]',

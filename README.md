@@ -6,7 +6,7 @@
 
 > Multi-step Postman flow runner for the free plan — no Enterprise required.
 
-`newman-flows` sits on top of [Newman](https://github.com/postmanlabs/newman) and adds the one thing Newman doesn't have: **flows**. A flow is an ordered sequence of named requests drawn from your Postman collection. Each request is defined exactly once; a flow just lists the steps to run and in what order.
+`newman-flows` runs on the [Postman CLI](https://learning.postman.com/docs/postman-cli/postman-cli-overview/) and adds the one thing a plain collection run doesn't have: **flows**. A flow is an ordered sequence of named requests drawn from your Postman collection. Each request is defined exactly once; a flow just lists the steps to run and in what order.
 
 ---
 
@@ -16,7 +16,17 @@
 npm install --save-dev newman-flows
 ```
 
-Newman itself is a peer dependency and installs automatically.
+It needs the Postman CLI, which is not installed with it. Install it the way Postman documents in the [installation guide](https://learning.postman.com/docs/postman-cli/postman-cli-installation/), for example:
+
+```bash
+curl -o- "https://dl-cli.pstmn.io/install/unix.sh" | sh   # macOS, Linux, WSL
+# or
+npm install -g postman-cli
+```
+
+`newman-flows` runs `postman` from your `PATH`. Set `POSTMAN_CLI` to the binary's path to use another one. No Postman account or login is needed: flows run locally and nothing is published to Postman cloud.
+
+Up to 1.x it ran on [Newman](https://github.com/postmanlabs/newman), which went into maintenance mode in September 2026.
 
 ---
 
@@ -263,14 +273,16 @@ npm run test:flow -- "My flow name"
 
 ## Reports
 
-`newman-flows` passes reporter flags straight to Newman:
+`newman-flows` uses the Postman CLI's own reporters: `cli`, `json`, `junit` and `html`. `htmlextra` is still accepted and means `html`.
 
 ```bash
 mkdir -p test/results/newman && npx newman-flows run --all \
-  --reporters cli,junit,htmlextra \
+  --reporters cli,junit,html \
   --reporter-junit-export ./test/results/newman/results.xml \
-  --reporter-htmlextra-export ./test/results/newman/report.html
+  --reporter-html-export ./test/results/newman/report.html
 ```
+
+The json report is the Postman CLI's, not Newman's: each entry in `run.executions` has `requestExecuted` (the step) and `tests`, each with `name` and `status`, where Newman had `item` and `assertions`.
 
 Programmatic API:
 
@@ -386,6 +398,9 @@ pm.test('No data leaked in error response', () => {
 ## CI
 
 ```yaml
+- name: Install the Postman CLI
+  run: curl -o- "https://dl-cli.pstmn.io/install/unix.sh" | sh
+
 - name: Run all flows
   run: |
     mkdir -p test/results/newman
