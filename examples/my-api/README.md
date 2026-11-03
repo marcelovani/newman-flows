@@ -16,6 +16,8 @@ A complete, runnable example of a `newman-flows` collection. It demonstrates the
 
 ## Running the examples
 
+You need the Postman CLI on your `PATH` (see [Installation](../../README.md#installation)).
+
 Start the included mock server first (no dependencies, plain Node.js):
 
 ```bash
@@ -237,10 +239,11 @@ A ready-to-use mock server is included at `mock-server.js`. It implements all th
 **To reproduce the full example from scratch:**
 
 ```bash
-# 1. Clone the repo and install
+# 1. Clone the repo and install, with the Postman CLI
 git clone https://github.com/your-org/newman-flows.git
 cd newman-flows
 npm install
+curl -o- "https://dl-cli.pstmn.io/install/unix.sh" | sh
 
 # 2. Start the mock server (leave this running in one terminal)
 node examples/my-api/mock-server.js
