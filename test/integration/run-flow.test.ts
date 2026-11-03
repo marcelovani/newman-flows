@@ -204,17 +204,13 @@ async function runAndReport(collection: string): Promise<{
   const json = JSON.parse(fs.readFileSync(report, 'utf8')) as {
     run: {
       executions: Array<{
-        requestExecuted: { name: string };
-        tests?: Array<{ name: string; status: string }>;
+        item: { name: string };
+        assertions?: Array<{ assertion: string; error?: unknown }>;
       }>;
     };
   };
   const assertions = json.run.executions.flatMap((e) =>
-    (e.tests ?? []).map((t) => ({
-      step: e.requestExecuted.name,
-      assertion: t.name,
-      ok: t.status === 'passed',
-    })),
+    (e.assertions ?? []).map((a) => ({ step: e.item.name, assertion: a.assertion, ok: !a.error })),
   );
   return { failed, assertions };
 }
@@ -255,9 +251,9 @@ describe('step variables', () => {
       reporter: { json: { export: report } },
     });
     const json = JSON.parse(fs.readFileSync(report, 'utf8')) as {
-      run: { executions: Array<{ requestExecuted: { name: string } }> };
+      run: { executions: Array<{ item: { name: string } }> };
     };
-    expect(json.run.executions.map((e) => e.requestExecuted.name)).toEqual([
+    expect(json.run.executions.map((e) => e.item.name)).toEqual([
       'Admin login',
       'Create Item',
       'View Item As Actor [actor=admin]',

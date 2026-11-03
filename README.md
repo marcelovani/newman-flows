@@ -282,7 +282,7 @@ mkdir -p test/results/newman && npx newman-flows run --all \
   --reporter-html-export ./test/results/newman/report.html
 ```
 
-The json report is the Postman CLI's, not Newman's: each entry in `run.executions` has `requestExecuted` (the step) and `tests`, each with `name` and `status`, where Newman had `item` and `assertions`.
+The json report keeps Newman's shape: each entry in `run.executions` has `item` (the step's request as it ran) and `assertions`, so tools that read Newman's report keep working. A directory export writes `newman-run-report-<timestamp>-0.json` per flow, as Newman did.
 
 Programmatic API:
 

@@ -489,7 +489,7 @@ describe('buildTempCollection', () => {
     expect(view.event).toBeUndefined();
   });
 
-  it('leaves a flow without variables exactly as before', async () => {
+  it('leaves a flow without variables as it was, apart from step ids', async () => {
     const { buildTempCollection } = await import('../../src/commands/run.js');
     const view: PostmanItem = {
       name: 'View',
@@ -497,7 +497,10 @@ describe('buildTempCollection', () => {
     };
     const collection = makeCollection([], [{ name: 'Requests', item: [view] }]);
     const temp = buildTempCollection(collection, { name: 'F', steps: ['View', 'View'] });
-    expect(temp.item).toEqual([view, view]);
+    expect(temp.item).toEqual([
+      { ...view, id: 'step-1' },
+      { ...view, id: 'step-2' },
+    ]);
   });
 
   it('keeps collection variables and auth', async () => {

@@ -8,7 +8,9 @@
  * reference `_flow_steps` (a routing helper that is unnecessary when running a
  * flat sequence).
  *
- * Reporters are the CLI's own; this package defaults only to `cli`.
+ * Reporters are the CLI's own; this package defaults only to `cli`. The json
+ * report is rewritten into Newman's shape, so tools that read Newman's keep
+ * working (see lib/report.ts).
  */
 
 import * as fs from 'fs';
@@ -22,6 +24,7 @@ import {
 } from '../lib/collection.js';
 import { extractFlowDef, findFlowRequest, listFlows } from '../lib/flows.js';
 import { runPostmanCli } from '../lib/postman-cli.js';
+import { writeNewmanReport } from '../lib/report.js';
 import type {
   FlowDef,
   FlowStep,
@@ -113,14 +116,16 @@ function withStepVars(req: PostmanItem, step: FlowStep, restore: boolean): Postm
 export function buildTempCollection(
   collection: PostmanCollection,
   flowDef: FlowDef,
-): Record<string, unknown> {
+): Record<string, unknown> & { info: PostmanCollection['info']; item: PostmanItem[] } {
   const stepDefs: FlowStep[] = flowDef.stepDefs ?? flowDef.steps.map((step) => ({ step }));
   const flowItems = stepDefs.map((step, i) => {
     const req = findRequest(collection.item, step.step);
     if (!req) throw new Error(`Step "${step.step}" not found in collection.`);
     // Only a step after one with variables has anything to restore.
     const restore = stepDefs.slice(0, i).some((s) => s.vars);
-    return withStepVars(req, step, restore);
+    // A request can run more than once in a flow, so each step gets its own
+    // id, which the CLI reports back and the json report is matched on.
+    return { ...withStepVars(req, step, restore), id: `step-${i + 1}` };
   });
 
   return {
@@ -164,7 +169,19 @@ async function runFlowDef(
   try {
     const collectionPath = path.join(tmpDir, 'flow.postman_collection.json');
     fs.writeFileSync(collectionPath, JSON.stringify(tempCollection));
-    const code = await runPostmanCli({ collectionPath, envPath, reporters, reporter });
+    // The CLI writes its json report here, to be rewritten where it was asked for.
+    const jsonExport = (reporter?.json as { export?: unknown } | undefined)?.export;
+    const cliJson = path.join(tmpDir, 'report.json');
+    const code = await runPostmanCli({
+      collectionPath,
+      envPath,
+      reporters,
+      reporter:
+        typeof jsonExport === 'string' ? { ...reporter, json: { export: cliJson } } : reporter,
+    });
+    if (typeof jsonExport === 'string' && fs.existsSync(cliJson)) {
+      writeNewmanReport(cliJson, tempCollection, jsonExport);
+    }
     if (code !== 0) {
       console.error(`\n❌ Flow "${flowDef.name}" failed.`);
       throw new Error(`Flow "${flowDef.name}" failed (Postman CLI exit code ${code}).`);
