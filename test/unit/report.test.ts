@@ -7,8 +7,16 @@ import { reportPath, toNewmanReport } from '../../src/lib/report.js';
 const collection = {
   info: { name: 'API — Flow: Viewing' },
   item: [
-    { id: 'step-1', name: 'View [actor=admin]', request: { method: 'GET', url: '{{url}}/a' } },
-    { id: 'step-2', name: 'View [actor=member]', request: { method: 'GET', url: '{{url}}/a' } },
+    {
+      id: 'step-1',
+      name: 'View [actor=admin]',
+      request: { method: 'GET', url: { raw: '{{url}}/a' } },
+    },
+    {
+      id: 'step-2',
+      name: 'View [actor=member]',
+      request: { method: 'GET', url: { raw: '{{url}}/a' } },
+    },
   ],
 };
 
