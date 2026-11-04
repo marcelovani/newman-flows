@@ -8,7 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
-- **Breaking:** flows run on the [Postman CLI](https://learning.postman.com/docs/postman-cli/postman-cli-overview/) instead of Newman, which went into maintenance mode in September 2026 and still ships dependencies with known vulnerabilities. The CLI is not a dependency: install it as Postman documents, and `newman-flows` runs `postman` from `PATH`, or the binary at `POSTMAN_CLI`. No Postman login is needed.
+- **Breaking:** flows run on the [Postman CLI](https://learning.postman.com/docs/postman-cli/postman-cli-overview/) instead of Newman, which went into maintenance mode in September 2026 and still ships dependencies with known vulnerabilities. The CLI is not a dependency: install it as Postman documents, and `newman-flows` runs `postman` from `PATH`, or the binary at `POSTMAN_CLI`.
 - The json report is rewritten into Newman's shape (`run.executions[].item` and `.assertions`), so tools that read it don't change.
 - The html report comes from the CLI's built-in `html` reporter. `htmlextra` and `--reporter-htmlextra-export` still work and mean `html`.
 - A failed flow's error says the flow failed and the CLI's exit code, not a count of failures.
