@@ -25,7 +25,7 @@ const program = new Command();
 
 program
   .name('newman-flows')
-  .description('Run multi-step Postman flows via Newman — no Enterprise required.')
+  .description('Run multi-step Postman flows via the Postman CLI — no Enterprise required.')
   .version(pkg.version, '-V, --version');
 
 // ---------------------------------------------------------------------------
@@ -57,9 +57,10 @@ program
   .option('--all', 'run every flow defined in the Flows/ folder')
   .option('--collection <path>', 'path to the Postman collection JSON file')
   .option('--env <path>', 'path to a Postman environment JSON file')
-  .option('--reporters <list>', 'comma-separated list of Newman reporters (default: cli)')
+  .option('--reporters <list>', 'comma-separated list of Postman CLI reporters (default: cli)')
   .option('--reporter-junit-export <path>', 'export path for the JUnit XML report')
-  .option('--reporter-htmlextra-export <path>', 'export path for the HTML report')
+  .option('--reporter-html-export <path>', 'export path for the HTML report')
+  .option('--reporter-htmlextra-export <path>', 'deprecated: same as --reporter-html-export')
   .option('--reporter-json-export <path>', 'export path for the JSON report')
   .action(
     async (
@@ -70,6 +71,7 @@ program
         env?: string;
         reporters?: string;
         reporterJunitExport?: string;
+        reporterHtmlExport?: string;
         reporterHtmlextraExport?: string;
         reporterJsonExport?: string;
       },
@@ -81,8 +83,8 @@ program
 
         const reporter: Record<string, unknown> = {};
         if (opts.reporterJunitExport) reporter['junit'] = { export: opts.reporterJunitExport };
-        if (opts.reporterHtmlextraExport)
-          reporter['htmlextra'] = { export: opts.reporterHtmlextraExport };
+        const htmlExport = opts.reporterHtmlExport ?? opts.reporterHtmlextraExport;
+        if (htmlExport) reporter['html'] = { export: htmlExport };
         if (opts.reporterJsonExport) reporter['json'] = { export: opts.reporterJsonExport };
 
         if (opts.all) {

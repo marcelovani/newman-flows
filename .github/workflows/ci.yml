@@ -60,6 +60,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Install the Postman CLI
+        run: curl -o- "https://dl-cli.pstmn.io/install/unix.sh" | sh
+
       - name: Run integration tests
         run: npm run test:integration
 

@@ -42,6 +42,7 @@ export interface PostmanRequest {
 }
 
 export interface PostmanItem {
+  id?: string;
   name: string;
   item?: PostmanItem[];
   request?: PostmanRequest;
@@ -98,14 +99,16 @@ export interface RunOptions {
   /** Absolute or relative path to a Postman environment JSON file. */
   env?: string;
   /**
-   * Newman reporters to activate. Accepts a single reporter name or an array.
+   * Postman CLI reporters to activate (`cli`, `json`, `junit`, `html`;
+   * `htmlextra` is taken as `html`). Accepts a single reporter name or an array.
    * Defaults to `'cli'` when omitted.
    *
    * @example ['cli', 'junit', 'htmlextra']
    */
   reporters?: string | string[];
   /**
-   * Per-reporter configuration passed directly to `newman.run()`.
+   * Per-reporter configuration. Only `export` is used, passed to the CLI as
+   * `--reporter-<name>-export`.
    * Keys are reporter names; values are the reporter-specific option objects.
    *
    * @example { junit: { export: './results.xml' }, htmlextra: { export: './report.html' } }

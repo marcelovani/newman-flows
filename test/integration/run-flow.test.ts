@@ -2,9 +2,9 @@
  * Integration tests for the newman-flows run command.
  *
  * These tests start the mock server (via setup.ts), load the fixture
- * collection, and run each flow end-to-end through newman.run() to verify
+ * collection, and run each flow end-to-end through the Postman CLI to verify
  * that the full pipeline works: step extraction → temp collection assembly →
- * Newman execution → assertions.
+ * Postman CLI execution → assertions.
  *
  * Results are written to a temp directory so they don't pollute the repo.
  */
@@ -222,7 +222,7 @@ describe('step variables', () => {
       "steps(['Admin login', 'Create Item', { step: 'View Item As Actor', vars: { actor: 'anonymous', expected_status: 200 } }]);",
     );
     await expect(runFlow({ collection, flow: 'Under test', env: envPath })).rejects.toThrow(
-      'failure',
+      'failed',
     );
   }, 30_000);
 

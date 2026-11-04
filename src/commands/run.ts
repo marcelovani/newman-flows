@@ -1,17 +1,21 @@
 /**
- * Run command — assembles a temporary flat collection for a flow and passes
- * it to newman.run().
+ * Run command — assembles a temporary flat collection for a flow and runs it
+ * with the Postman CLI.
  *
- * The temporary collection is built in memory and never written to disk.
- * It contains only the requests belonging to the flow, in the declared order,
- * and strips any collection-level scripts that reference `_flow_steps` (a
- * routing helper that is unnecessary when running a flat sequence).
+ * The temporary collection is written to a temp directory for the CLI to read,
+ * and removed after the run. It contains only the requests belonging to the
+ * flow, in the declared order, and strips any collection-level scripts that
+ * reference `_flow_steps` (a routing helper that is unnecessary when running a
+ * flat sequence).
  *
- * Reporter configuration is passed straight through to newman.run() — this
- * package does not add or default any reporters beyond Newman's own defaults.
+ * Reporters are the CLI's own; this package defaults only to `cli`. The json
+ * report is rewritten into Newman's shape, so tools that read Newman's keep
+ * working (see lib/report.ts).
  */
 
-import newman, { type NewmanRunOptions } from 'newman';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import {
   findRequest,
   loadCollection,
@@ -19,6 +23,8 @@ import {
   resolveEnvironmentPath,
 } from '../lib/collection.js';
 import { extractFlowDef, findFlowRequest, listFlows } from '../lib/flows.js';
+import { runPostmanCli } from '../lib/postman-cli.js';
+import { writeNewmanReport } from '../lib/report.js';
 import type {
   FlowDef,
   FlowStep,
@@ -104,20 +110,22 @@ function withStepVars(req: PostmanItem, step: FlowStep, restore: boolean): Postm
 }
 
 /**
- * Build the temporary flat collection that Newman will run.
+ * Build the temporary flat collection the Postman CLI will run.
  * Exported for unit-testability.
  */
 export function buildTempCollection(
   collection: PostmanCollection,
   flowDef: FlowDef,
-): Record<string, unknown> {
+): Record<string, unknown> & { info: PostmanCollection['info']; item: PostmanItem[] } {
   const stepDefs: FlowStep[] = flowDef.stepDefs ?? flowDef.steps.map((step) => ({ step }));
   const flowItems = stepDefs.map((step, i) => {
     const req = findRequest(collection.item, step.step);
     if (!req) throw new Error(`Step "${step.step}" not found in collection.`);
     // Only a step after one with variables has anything to restore.
     const restore = stepDefs.slice(0, i).some((s) => s.vars);
-    return withStepVars(req, step, restore);
+    // A request can run more than once in a flow, so each step gets its own
+    // id, which the CLI reports back and the json report is matched on.
+    return { ...withStepVars(req, step, restore), id: `step-${i + 1}` };
   });
 
   return {
@@ -151,33 +159,37 @@ async function runFlowDef(
   reporters: string | string[] | undefined,
   reporter: Record<string, unknown> | undefined,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const tempCollection = buildTempCollection(collection, flowDef);
+  const tempCollection = buildTempCollection(collection, flowDef);
 
-    console.log(`\n▶ Running flow: ${flowDef.name}`);
-    const labels = flowDef.stepDefs?.map(stepLabel) ?? flowDef.steps;
-    console.log(`  Steps: ${labels.join(' → ')}\n`);
+  console.log(`\n▶ Running flow: ${flowDef.name}`);
+  const labels = flowDef.stepDefs?.map(stepLabel) ?? flowDef.steps;
+  console.log(`  Steps: ${labels.join(' → ')}\n`);
 
-    newman.run(
-      {
-        collection: tempCollection as NewmanRunOptions['collection'],
-        environment: envPath,
-        insecure: true,
-        reporters: reporters ?? 'cli',
-        reporter: reporter ?? {},
-      },
-      (err, summary) => {
-        if (err) return reject(err);
-        const failed = summary.run.failures.length;
-        if (failed > 0) {
-          console.error(`\n❌ Flow "${flowDef.name}" had ${failed} failure(s).`);
-          return reject(new Error(`${failed} failure(s)`));
-        }
-        console.log(`\n✅ Flow "${flowDef.name}" passed.`);
-        resolve();
-      },
-    );
-  });
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'newman-flows-'));
+  try {
+    const collectionPath = path.join(tmpDir, 'flow.postman_collection.json');
+    fs.writeFileSync(collectionPath, JSON.stringify(tempCollection));
+    // The CLI writes its json report here, to be rewritten where it was asked for.
+    const jsonExport = (reporter?.json as { export?: unknown } | undefined)?.export;
+    const cliJson = path.join(tmpDir, 'report.json');
+    const code = await runPostmanCli({
+      collectionPath,
+      envPath,
+      reporters,
+      reporter:
+        typeof jsonExport === 'string' ? { ...reporter, json: { export: cliJson } } : reporter,
+    });
+    if (typeof jsonExport === 'string' && fs.existsSync(cliJson)) {
+      writeNewmanReport(cliJson, tempCollection, jsonExport);
+    }
+    if (code !== 0) {
+      console.error(`\n❌ Flow "${flowDef.name}" failed.`);
+      throw new Error(`Flow "${flowDef.name}" failed (Postman CLI exit code ${code}).`);
+    }
+    console.log(`\n✅ Flow "${flowDef.name}" passed.`);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -192,14 +204,14 @@ async function runFlowDef(
  * @param opts.flow      - Exact name of the flow to run (case-sensitive).
  * @param opts.env       - Path to a `.postman_environment.json` file, or
  *   `undefined` to auto-discover / run without an environment.
- * @param opts.reporters - Newman reporters to activate (e.g. `['cli', 'junit']`).
+ * @param opts.reporters - Postman CLI reporters to activate (e.g. `['cli', 'junit']`).
  *   Defaults to `'cli'`.
- * @param opts.reporter  - Per-reporter options passed directly to `newman.run()`
+ * @param opts.reporter  - Per-reporter options; each `export` path is passed to the CLI
  *   (e.g. `{ junit: { export: './results.xml' } }`).
  *
  * @throws {Error} If the collection or environment file cannot be resolved.
  * @throws {Error} If the named flow does not exist in the collection.
- * @throws {Error} If any Newman test assertion fails.
+ * @throws {Error} If any test assertion fails.
  */
 export async function runFlow(opts: RunOptions & { flow: string }): Promise<void> {
   const collectionPath = resolveCollectionPath(opts.collection);
@@ -217,14 +229,14 @@ export async function runFlow(opts: RunOptions & { flow: string }): Promise<void
  *   `undefined` to auto-discover from `<cwd>/dev/Postman/`.
  * @param opts.env       - Path to a `.postman_environment.json` file, or
  *   `undefined` to auto-discover / run without an environment.
- * @param opts.reporters - Newman reporters to activate (e.g. `['cli', 'junit']`).
+ * @param opts.reporters - Postman CLI reporters to activate (e.g. `['cli', 'junit']`).
  *   Defaults to `'cli'`.
- * @param opts.reporter  - Per-reporter options passed directly to `newman.run()`
+ * @param opts.reporter  - Per-reporter options; each `export` path is passed to the CLI
  *   (e.g. `{ junit: { export: './results.xml' } }`).
  *
  * @throws {Error} If the collection or environment file cannot be resolved.
  * @throws {Error} If the collection contains no flows.
- * @throws {Error} If any Newman test assertion fails (fails-fast on first failing flow).
+ * @throws {Error} If any test assertion fails (fails-fast on first failing flow).
  */
 export async function runAllFlows(opts: RunOptions): Promise<void> {
   const collectionPath = resolveCollectionPath(opts.collection);
