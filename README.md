@@ -24,7 +24,7 @@ curl -o- "https://dl-cli.pstmn.io/install/unix.sh" | sh   # macOS, Linux, WSL
 npm install -g postman-cli
 ```
 
-`newman-flows` runs `postman` from your `PATH`. Set `POSTMAN_CLI` to the binary's path to use another one. No Postman account or login is needed: flows run locally and nothing is published to Postman cloud.
+`newman-flows` runs `postman` from your `PATH`. Set `POSTMAN_CLI` to the binary's path to use another one. We advise running it with a Postman account (`postman login`). The CLI is covered by [Postman's terms](https://www.postman.com/legal/terms/), so check how they apply to you.
 
 Up to 1.x it ran on [Newman](https://github.com/postmanlabs/newman), which went into maintenance mode in September 2026.
 
